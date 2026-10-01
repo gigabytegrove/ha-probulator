@@ -60,6 +60,15 @@ SENSORS: tuple[ProbulatorSensorDescription, ...] = (
         value_fn=lambda data: data.get("p95_response_time_ms"),
     ),
     ProbulatorSensorDescription(
+        key="jitter_ms",
+        translation_key="jitter",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda data: data.get("jitter_ms"),
+    ),
+    ProbulatorSensorDescription(
         key="min_response_time_ms",
         translation_key="minimum_response_time",
         native_unit_of_measurement=UnitOfTime.MILLISECONDS,
