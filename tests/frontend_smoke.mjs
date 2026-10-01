@@ -64,9 +64,11 @@ const expectedElements = [
   "probulator-card",
   "probulator-overview-card",
   "probulator-summary-card",
+  "probulator-manager-card",
   "probulator-target-editor",
   "probulator-overview-editor",
   "probulator-summary-editor",
+  "probulator-manager-editor",
 ];
 
 for (const name of expectedElements) {
@@ -80,6 +82,7 @@ for (const type of [
   "probulator-card",
   "probulator-overview-card",
   "probulator-summary-card",
+  "probulator-manager-card",
 ]) {
   if (!registeredCards.has(type)) {
     throw new Error(`missing custom card registration: ${type}`);
@@ -100,6 +103,7 @@ for (const [cardName, editorName] of [
   ["probulator-card", "probulator-target-editor"],
   ["probulator-overview-card", "probulator-overview-editor"],
   ["probulator-summary-card", "probulator-summary-editor"],
+  ["probulator-manager-card", "probulator-manager-editor"],
 ]) {
   const Card = registry.get(cardName);
   const editor = await Card.getConfigElement();
@@ -110,6 +114,36 @@ for (const [cardName, editorName] of [
 
 const target = new TargetCard();
 target.setConfig({ entity: "binary_sensor.example", mode: "normal" });
+
+target.hass = {
+  states: {
+    "binary_sensor.example": {
+      entity_id: "binary_sensor.example",
+      state: "on",
+      attributes: {
+        probulator: true,
+        probulator_kind: "target",
+        target_name: '<img src=x onerror="alert(1)">',
+        target: "<script>alert(1)</script>",
+        status: "online",
+        response_time_ms: 5,
+      },
+    },
+  },
+};
+if (
+  target.shadowRoot.innerHTML.includes("<img src=x")
+  || target.shadowRoot.innerHTML.includes("<script>alert")
+) {
+  throw new Error("target card rendered unescaped target-controlled HTML");
+}
+if (!target.shadowRoot.innerHTML.includes("&lt;img")) {
+  throw new Error("target card did not visibly escape hostile target text");
+}
+
+const ManagerCard = registry.get("probulator-manager-card");
+const manager = new ManagerCard();
+manager.setConfig({ title: "Manager", show_actions: true });
 
 let invalidModeRejected = false;
 try {
