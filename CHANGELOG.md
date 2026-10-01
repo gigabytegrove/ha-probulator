@@ -18,6 +18,9 @@ Operational intelligence and large-installation polish.
 - Added frontend/backend version handshake and a cache-busted resource URL keyed to the integration version.
 - Added reduced-motion support and hostile target-text rendering tests.
 - Added explicit config-entry migration to the 1.2 schema while preserving existing target IDs/entity identities.
+- Added administrator-only portable clone/import/export actions with dependency remapping and normal config-flow validation.
+- Added non-invasive target suggestions from network-address attributes already known to Home Assistant; no subnet or port scan is performed.
+- Added native Overall and per-group aggregate devices with Healthy, Availability, and Average response time entities.
 
 ## 1.1.0 - 2026-10-01
 
