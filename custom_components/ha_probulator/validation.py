@@ -75,6 +75,13 @@ def normalize_host(value: Any) -> str:
     except ValueError:
         pass
 
+    # Do not reinterpret a malformed dotted-quad as a DNS name. This avoids
+    # platform-dependent legacy numeric-address parsing (for example leading zeros).
+    if host.count(".") == 3 and all(
+        label.isdigit() for label in host.split(".")
+    ):
+        raise ValidationError("invalid_host")
+
     # A colon that is not part of a valid IP address usually means host:port or an
     # invalid IPv6 literal. Port is configured separately.
     if ":" in host:
