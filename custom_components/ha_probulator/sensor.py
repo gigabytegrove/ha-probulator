@@ -16,12 +16,14 @@ from homeassistant.components.sensor import (
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import PERCENTAGE, UnitOfTime
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity import EntityCategory
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .const import DATA_MANAGER, DOMAIN, VERSION
 from .coordinator import ProbulatorCoordinator
 from .entity import ProbulatorEntity
+from .runtime import ProbulatorRuntimeManager
 
 
 @dataclass(frozen=True, kw_only=True)
@@ -278,8 +280,21 @@ async def async_setup_entry(
 ) -> None:
     """Set up target sensors."""
     coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
+    manager: ProbulatorRuntimeManager = hass.data[DOMAIN][DATA_MANAGER]
     async_add_entities(
         [ProbulatorSensor(coordinator, entry, description) for description in SENSORS]
+    )
+    manager.register_group_platform(
+        "sensor",
+        entry.entry_id,
+        async_add_entities,
+        lambda group: [
+            ProbulatorGroupAvailabilitySensor(manager, group),
+            ProbulatorGroupResponseTimeSensor(manager, group),
+        ],
+    )
+    entry.async_on_unload(
+        lambda: manager.unregister_group_platform("sensor", entry.entry_id)
     )
 
 
@@ -301,3 +316,83 @@ class ProbulatorSensor(ProbulatorEntity, SensorEntity):
     def native_value(self) -> str | int | float | datetime | None:
         """Return the current metric value."""
         return self.entity_description.value_fn(self.coordinator.data)
+
+
+class _ProbulatorGroupSensorBase(SensorEntity):
+    """Base class for one group aggregate sensor."""
+
+    _attr_has_entity_name = True
+
+    def __init__(self, manager: ProbulatorRuntimeManager, group: str, key: str) -> None:
+        self._manager = manager
+        self._group = group
+        group_key = group.casefold()
+        self._attr_unique_id = f"group:{group_key}:{key}"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"group:{group_key}")},
+            name=f"HA Probulator · {group}",
+            manufacturer="Gigabyte Grove",
+            model="HA Probulator Group",
+            sw_version=VERSION,
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return whether the group still has loaded targets."""
+        return self._manager.group_snapshot(self._group)["total_targets"] > 0
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose aggregate group counts."""
+        snapshot = self._manager.group_snapshot(self._group)
+        return {
+            "probulator": True,
+            "probulator_kind": "group",
+            "group": self._group,
+            "total_targets": snapshot["total_targets"],
+            "active_targets": snapshot["active_targets"],
+            "online": snapshot["online"],
+            "degraded": snapshot["degraded"],
+            "unstable": snapshot["unstable"],
+            "offline": snapshot["offline"],
+            "dependency_offline": snapshot["dependency_offline"],
+            "maintenance": snapshot["maintenance"],
+            "disabled": snapshot["disabled"],
+            "probing": snapshot["probing"],
+        }
+
+
+class ProbulatorGroupAvailabilitySensor(_ProbulatorGroupSensorBase):
+    """Average rolling availability across active members of a group."""
+
+    _attr_name = "Availability"
+    _attr_native_unit_of_measurement = PERCENTAGE
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 2
+    _attr_icon = "mdi:check-network-outline"
+
+    def __init__(self, manager: ProbulatorRuntimeManager, group: str) -> None:
+        super().__init__(manager, group, "availability")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return average member rolling success rate."""
+        return self._manager.group_snapshot(self._group)["availability"]
+
+
+class ProbulatorGroupResponseTimeSensor(_ProbulatorGroupSensorBase):
+    """Average current response time across active members of a group."""
+
+    _attr_name = "Average response time"
+    _attr_native_unit_of_measurement = UnitOfTime.MILLISECONDS
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_suggested_display_precision = 1
+    _attr_icon = "mdi:timer-outline"
+
+    def __init__(self, manager: ProbulatorRuntimeManager, group: str) -> None:
+        super().__init__(manager, group, "average_response_time")
+
+    @property
+    def native_value(self) -> float | None:
+        """Return average current response time for active members."""
+        return self._manager.group_snapshot(self._group)["average_response_time_ms"]
