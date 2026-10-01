@@ -88,6 +88,49 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(state["window_samples"], 3)
         self.assertEqual(len(state["latency_history"]), 3)
 
+    def test_flapping_detects_repeated_success_failure_transitions(self) -> None:
+        metrics_obj = metrics.ProbeMetrics(
+            window_size=12,
+            failure_threshold=2,
+            recovery_threshold=1,
+            warning_latency_ms=100,
+            critical_latency_ms=300,
+            flap_window=6,
+            flap_threshold=3,
+        )
+        metrics_obj.record(self.sample(0, True, 10))
+        metrics_obj.record(self.sample(1, False))
+        metrics_obj.record(self.sample(2, True, 12))
+        state = metrics_obj.record(self.sample(3, False))
+        self.assertTrue(state["flapping"])
+        self.assertEqual(state["flap_transitions"], 3)
+        self.assertEqual(state["status"], "unstable")
+
+    def test_persistent_lifetime_metrics_restore(self) -> None:
+        restored = metrics.ProbeMetrics(
+            window_size=10,
+            failure_threshold=2,
+            recovery_threshold=1,
+            warning_latency_ms=100,
+            critical_latency_ms=300,
+        )
+        restored.restore_persistent(
+            {
+                "total_probes": 100,
+                "successful_probes": 97,
+                "failed_probes": 3,
+                "last_success": self.base.isoformat(),
+                "last_failure": (self.base - timedelta(minutes=1)).isoformat(),
+                "last_outage_duration_seconds": 42.5,
+            }
+        )
+        state = restored.snapshot()
+        self.assertEqual(state["total_probes"], 100)
+        self.assertEqual(state["successful_probes"], 97)
+        self.assertEqual(state["failed_probes"], 3)
+        self.assertEqual(state["last_success"], self.base)
+        self.assertEqual(state["last_outage_duration_seconds"], 42.5)
+
 
 if __name__ == "__main__":
     unittest.main()
