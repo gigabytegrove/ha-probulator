@@ -5,8 +5,10 @@ from __future__ import annotations
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
+import math
 from typing import Any
 
+from .const import LATENCY_HISTORY_LIMIT
 from .probe import ProbeSample
 
 
@@ -18,7 +20,7 @@ class _ObservedSample:
 
 
 class ProbeMetrics:
-    """Track debounced reachability and rolling probe statistics."""
+    """Track debounced reachability, outages, and rolling probe statistics."""
 
     def __init__(
         self,
@@ -43,6 +45,10 @@ class ProbeMetrics:
         self.failed_probes = 0
         self.last_success: datetime | None = None
         self.last_failure: datetime | None = None
+        self.last_check: datetime | None = None
+        self.last_status_change: datetime | None = None
+        self.outage_started: datetime | None = None
+        self.last_outage_duration_seconds: float | None = None
         self.last_error: str | None = None
         self.latest: ProbeSample | None = None
 
@@ -79,7 +85,11 @@ class ProbeMetrics:
 
     def record(self, sample: ProbeSample) -> dict[str, Any]:
         """Record a sample and return the complete current snapshot."""
+        previous_status = self.status
+        previous_reachable = self.reachable
+
         self.latest = sample
+        self.last_check = sample.timestamp
         self.total_probes += 1
         self._samples.append(
             _ObservedSample(sample.timestamp, sample.success, sample.latency_ms)
@@ -106,6 +116,20 @@ class ProbeMetrics:
             ):
                 self.reachable = False
 
+        if previous_reachable is not False and self.reachable is False:
+            self.outage_started = sample.timestamp
+        elif previous_reachable is False and self.reachable is True:
+            if self.outage_started is not None:
+                self.last_outage_duration_seconds = round(
+                    max(0.0, (sample.timestamp - self.outage_started).total_seconds()),
+                    3,
+                )
+            self.outage_started = None
+
+        current_status = self.status
+        if self.last_status_change is None or current_status != previous_status:
+            self.last_status_change = sample.timestamp
+
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
@@ -121,11 +145,23 @@ class ProbeMetrics:
         average = round(sum(successful) / len(successful), 3) if successful else None
         minimum = round(min(successful), 3) if successful else None
         maximum = round(max(successful), 3) if successful else None
+        p95 = None
+        if successful:
+            ordered = sorted(successful)
+            rank = max(0, math.ceil(len(ordered) * 0.95) - 1)
+            p95 = round(ordered[rank], 3)
+
         success_rate = (
             round((window_successes / window_count) * 100.0, 3)
             if window_count
             else None
         )
+        current_outage = None
+        if self.outage_started is not None and self.last_check is not None:
+            current_outage = round(
+                max(0.0, (self.last_check - self.outage_started).total_seconds()),
+                3,
+            )
 
         history = [
             {
@@ -133,7 +169,7 @@ class ProbeMetrics:
                 "latency_ms": sample.latency_ms,
                 "success": sample.success,
             }
-            for sample in list(self._samples)[-30:]
+            for sample in list(self._samples)[-LATENCY_HISTORY_LIMIT:]
         ]
 
         return {
@@ -144,7 +180,9 @@ class ProbeMetrics:
             "average_response_time_ms": average,
             "min_response_time_ms": minimum,
             "max_response_time_ms": maximum,
+            "p95_response_time_ms": p95,
             "success_rate": success_rate,
+            "window_samples": window_count,
             "consecutive_failures": self.consecutive_failures,
             "consecutive_successes": self.consecutive_successes,
             "total_probes": self.total_probes,
@@ -152,6 +190,11 @@ class ProbeMetrics:
             "failed_probes": self.failed_probes,
             "last_success": self.last_success,
             "last_failure": self.last_failure,
+            "last_check": self.last_check,
+            "last_status_change": self.last_status_change,
+            "outage_started": self.outage_started,
+            "current_outage_duration_seconds": current_outage,
+            "last_outage_duration_seconds": self.last_outage_duration_seconds,
             "last_error": self.last_error,
             "attempts": self.latest.attempts if self.latest else 0,
             "latency_history": history,
