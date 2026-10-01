@@ -9,14 +9,22 @@ import voluptuous as vol
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, UnitOfTime
-from homeassistant.core import callback
+from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers import selector
+from homeassistant.helpers.selector import SelectOptionDict
 
 from .const import (
+    CONF_ADAPTIVE_POLLING,
     CONF_CRITICAL_LATENCY,
+    CONF_DEGRADED_SCAN_INTERVAL,
+    CONF_DEPENDENCY_TARGET_ID,
     CONF_FAILURE_THRESHOLD,
+    CONF_FLAP_THRESHOLD,
+    CONF_FLAP_WINDOW,
     CONF_GROUP,
     CONF_ICON,
+    CONF_OFFLINE_SCAN_INTERVAL,
+    CONF_PRESET,
     CONF_RECOVERY_THRESHOLD,
     CONF_RETRIES,
     CONF_RETRY_DELAY,
@@ -25,11 +33,18 @@ from .const import (
     CONF_TARGET_ID,
     CONF_TIMEOUT,
     CONF_WARNING_LATENCY,
+    DEFAULT_ADAPTIVE_POLLING,
     DEFAULT_CRITICAL_LATENCY,
+    DEFAULT_DEGRADED_SCAN_INTERVAL,
+    DEFAULT_DEPENDENCY_TARGET_ID,
     DEFAULT_FAILURE_THRESHOLD,
+    DEFAULT_FLAP_THRESHOLD,
+    DEFAULT_FLAP_WINDOW,
     DEFAULT_GROUP,
     DEFAULT_ICON,
+    DEFAULT_OFFLINE_SCAN_INTERVAL,
     DEFAULT_PORT,
+    DEFAULT_PRESET,
     DEFAULT_RECOVERY_THRESHOLD,
     DEFAULT_RETRIES,
     DEFAULT_RETRY_DELAY,
@@ -38,15 +53,20 @@ from .const import (
     DEFAULT_TIMEOUT,
     DEFAULT_WARNING_LATENCY,
     DOMAIN,
+    MAX_FLAP_THRESHOLD,
+    MAX_FLAP_WINDOW,
     MAX_RETRIES,
     MAX_SCAN_INTERVAL,
     MAX_STATISTICS_WINDOW,
     MAX_THRESHOLD,
     MAX_TIMEOUT,
+    MIN_FLAP_THRESHOLD,
+    MIN_FLAP_WINDOW,
     MIN_SCAN_INTERVAL,
     MIN_STATISTICS_WINDOW,
     MIN_TIMEOUT,
 )
+from .presets import PRESETS, get_preset
 from .validation import (
     ValidationError,
     normalize_group,
@@ -56,7 +76,28 @@ from .validation import (
 )
 
 
-def _target_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
+def _preset_schema(default: str = DEFAULT_PRESET) -> vol.Schema:
+    options = [
+        SelectOptionDict(value=preset.key, label=preset.name)
+        for preset in PRESETS.values()
+    ]
+    return vol.Schema(
+        {
+            vol.Required(CONF_PRESET, default=default): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            )
+        }
+    )
+
+
+def _target_schema(
+    defaults: dict[str, Any] | None = None,
+    *,
+    default_port: int = DEFAULT_PORT,
+) -> vol.Schema:
     defaults = defaults or {}
     return vol.Schema(
         {
@@ -67,7 +108,7 @@ def _target_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
                 CONF_HOST, default=defaults.get(CONF_HOST, "")
             ): selector.TextSelector(),
             vol.Required(
-                CONF_PORT, default=defaults.get(CONF_PORT, DEFAULT_PORT)
+                CONF_PORT, default=defaults.get(CONF_PORT, default_port)
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
@@ -80,23 +121,47 @@ def _target_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     )
 
 
-def _default_options() -> dict[str, Any]:
+def _dependency_options(
+    hass: HomeAssistant,
+    *,
+    exclude_entry_id: str | None = None,
+) -> list[SelectOptionDict]:
+    options = [SelectOptionDict(value="", label="None")]
+    for entry in hass.config_entries.async_entries(DOMAIN):
+        if entry.entry_id == exclude_entry_id:
+            continue
+        target_id = str(entry.data.get(CONF_TARGET_ID, entry.entry_id))
+        options.append(SelectOptionDict(value=target_id, label=entry.title))
+    return options
+
+
+def _default_options(preset_key: str = DEFAULT_PRESET) -> dict[str, Any]:
+    preset = get_preset(preset_key)
     return {
-        CONF_GROUP: DEFAULT_GROUP,
-        CONF_ICON: DEFAULT_ICON,
-        CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
-        CONF_TIMEOUT: DEFAULT_TIMEOUT,
-        CONF_RETRIES: DEFAULT_RETRIES,
+        CONF_GROUP: preset.group or DEFAULT_GROUP,
+        CONF_ICON: preset.icon or DEFAULT_ICON,
+        CONF_SCAN_INTERVAL: preset.scan_interval or DEFAULT_SCAN_INTERVAL,
+        CONF_TIMEOUT: preset.timeout or DEFAULT_TIMEOUT,
+        CONF_RETRIES: preset.retries if preset.retries >= 0 else DEFAULT_RETRIES,
         CONF_RETRY_DELAY: DEFAULT_RETRY_DELAY,
         CONF_FAILURE_THRESHOLD: DEFAULT_FAILURE_THRESHOLD,
         CONF_RECOVERY_THRESHOLD: DEFAULT_RECOVERY_THRESHOLD,
-        CONF_WARNING_LATENCY: DEFAULT_WARNING_LATENCY,
-        CONF_CRITICAL_LATENCY: DEFAULT_CRITICAL_LATENCY,
+        CONF_WARNING_LATENCY: preset.warning_latency_ms or DEFAULT_WARNING_LATENCY,
+        CONF_CRITICAL_LATENCY: preset.critical_latency_ms or DEFAULT_CRITICAL_LATENCY,
         CONF_STATISTICS_WINDOW: DEFAULT_STATISTICS_WINDOW,
+        CONF_DEPENDENCY_TARGET_ID: DEFAULT_DEPENDENCY_TARGET_ID,
+        CONF_ADAPTIVE_POLLING: DEFAULT_ADAPTIVE_POLLING,
+        CONF_DEGRADED_SCAN_INTERVAL: DEFAULT_DEGRADED_SCAN_INTERVAL,
+        CONF_OFFLINE_SCAN_INTERVAL: DEFAULT_OFFLINE_SCAN_INTERVAL,
+        CONF_FLAP_WINDOW: DEFAULT_FLAP_WINDOW,
+        CONF_FLAP_THRESHOLD: DEFAULT_FLAP_THRESHOLD,
     }
 
 
-def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
+def _options_schema(
+    defaults: dict[str, Any],
+    dependency_options: list[SelectOptionDict],
+) -> vol.Schema:
     merged = {**_default_options(), **defaults}
     return vol.Schema(
         {
@@ -104,8 +169,44 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 CONF_GROUP, default=merged[CONF_GROUP]
             ): selector.TextSelector(),
             vol.Required(CONF_ICON, default=merged[CONF_ICON]): selector.IconSelector(),
+            vol.Optional(
+                CONF_DEPENDENCY_TARGET_ID,
+                default=merged[CONF_DEPENDENCY_TARGET_ID],
+            ): selector.SelectSelector(
+                selector.SelectSelectorConfig(
+                    options=dependency_options,
+                    mode=selector.SelectSelectorMode.DROPDOWN,
+                )
+            ),
             vol.Required(
                 CONF_SCAN_INTERVAL, default=merged[CONF_SCAN_INTERVAL]
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL,
+                    max=MAX_SCAN_INTERVAL,
+                    step=1,
+                    unit_of_measurement=UnitOfTime.SECONDS,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_ADAPTIVE_POLLING, default=merged[CONF_ADAPTIVE_POLLING]
+            ): selector.BooleanSelector(),
+            vol.Required(
+                CONF_DEGRADED_SCAN_INTERVAL,
+                default=merged[CONF_DEGRADED_SCAN_INTERVAL],
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_SCAN_INTERVAL,
+                    max=MAX_SCAN_INTERVAL,
+                    step=1,
+                    unit_of_measurement=UnitOfTime.SECONDS,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_OFFLINE_SCAN_INTERVAL,
+                default=merged[CONF_OFFLINE_SCAN_INTERVAL],
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_SCAN_INTERVAL,
@@ -199,6 +300,26 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
+            vol.Required(
+                CONF_FLAP_WINDOW, default=merged[CONF_FLAP_WINDOW]
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_FLAP_WINDOW,
+                    max=MAX_FLAP_WINDOW,
+                    step=1,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
+            vol.Required(
+                CONF_FLAP_THRESHOLD, default=merged[CONF_FLAP_THRESHOLD]
+            ): selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=MIN_FLAP_THRESHOLD,
+                    max=MAX_FLAP_THRESHOLD,
+                    step=1,
+                    mode=selector.NumberSelectorMode.BOX,
+                )
+            ),
         }
     )
 
@@ -237,7 +358,13 @@ def _normalize_options(
     values = {
         CONF_GROUP: group,
         CONF_ICON: str(user_input.get(CONF_ICON) or DEFAULT_ICON).strip(),
+        CONF_DEPENDENCY_TARGET_ID: str(
+            user_input.get(CONF_DEPENDENCY_TARGET_ID) or ""
+        ).strip(),
         CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
+        CONF_ADAPTIVE_POLLING: bool(user_input[CONF_ADAPTIVE_POLLING]),
+        CONF_DEGRADED_SCAN_INTERVAL: int(user_input[CONF_DEGRADED_SCAN_INTERVAL]),
+        CONF_OFFLINE_SCAN_INTERVAL: int(user_input[CONF_OFFLINE_SCAN_INTERVAL]),
         CONF_TIMEOUT: float(user_input[CONF_TIMEOUT]),
         CONF_RETRIES: int(user_input[CONF_RETRIES]),
         CONF_RETRY_DELAY: float(user_input[CONF_RETRY_DELAY]),
@@ -246,10 +373,15 @@ def _normalize_options(
         CONF_WARNING_LATENCY: float(user_input[CONF_WARNING_LATENCY]),
         CONF_CRITICAL_LATENCY: float(user_input[CONF_CRITICAL_LATENCY]),
         CONF_STATISTICS_WINDOW: int(user_input[CONF_STATISTICS_WINDOW]),
+        CONF_FLAP_WINDOW: int(user_input[CONF_FLAP_WINDOW]),
+        CONF_FLAP_THRESHOLD: int(user_input[CONF_FLAP_THRESHOLD]),
     }
 
     if values[CONF_CRITICAL_LATENCY] <= values[CONF_WARNING_LATENCY]:
         errors[CONF_CRITICAL_LATENCY] = "critical_must_exceed_warning"
+
+    if values[CONF_FLAP_THRESHOLD] >= values[CONF_FLAP_WINDOW]:
+        errors[CONF_FLAP_THRESHOLD] = "flap_threshold_too_high"
 
     try:
         validate_probe_budget(
@@ -263,12 +395,46 @@ def _normalize_options(
     return values, errors
 
 
+def _would_create_dependency_cycle(
+    hass: HomeAssistant,
+    entry: config_entries.ConfigEntry,
+    dependency_target_id: str,
+) -> bool:
+    if not dependency_target_id:
+        return False
+
+    this_target_id = str(entry.data.get(CONF_TARGET_ID, entry.entry_id))
+    if dependency_target_id == this_target_id:
+        return True
+
+    by_target = {
+        str(item.data.get(CONF_TARGET_ID, item.entry_id)): str(
+            item.options.get(CONF_DEPENDENCY_TARGET_ID, "")
+        )
+        for item in hass.config_entries.async_entries(DOMAIN)
+    }
+    cursor = dependency_target_id
+    visited: set[str] = set()
+
+    while cursor:
+        if cursor == this_target_id:
+            return True
+        if cursor in visited:
+            return True
+        visited.add(cursor)
+        cursor = by_target.get(cursor, "")
+
+    return False
+
+
 class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle HA Probulator config entries."""
 
-    VERSION = 1
+    VERSION = 2
+    MINOR_VERSION = 1
 
     def __init__(self) -> None:
+        self._pending_preset = DEFAULT_PRESET
         self._pending_target: dict[str, Any] | None = None
 
     @staticmethod
@@ -282,9 +448,23 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
+        """Choose a target role preset."""
+        if user_input is not None:
+            self._pending_preset = str(user_input.get(CONF_PRESET, DEFAULT_PRESET))
+            return await self.async_step_target()
+
+        return self.async_show_form(
+            step_id="user",
+            data_schema=_preset_schema(self._pending_preset),
+        )
+
+    async def async_step_target(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
         """Collect a new monitored target."""
         errors: dict[str, str] = {}
         suggested = user_input or {}
+        preset = get_preset(self._pending_preset)
 
         if user_input is not None:
             values, errors = _normalize_target_input(user_input)
@@ -297,9 +477,9 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 return await self.async_step_monitoring()
 
         return self.async_show_form(
-            step_id="user",
+            step_id="target",
             data_schema=self.add_suggested_values_to_schema(
-                _target_schema(), suggested
+                _target_schema(default_port=preset.port), suggested
             ),
             errors=errors,
         )
@@ -311,8 +491,9 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         if self._pending_target is None:
             return self.async_abort(reason="setup_incomplete")
 
+        defaults = _default_options(self._pending_preset)
         errors: dict[str, str] = {}
-        suggested = user_input or _default_options()
+        suggested = user_input or defaults
 
         if user_input is not None:
             values, errors = _normalize_options(user_input)
@@ -330,6 +511,7 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                     title=self._pending_target[CONF_NAME],
                     data={
                         CONF_TARGET_ID: target_id,
+                        CONF_PRESET: self._pending_preset,
                         CONF_HOST: self._pending_target[CONF_HOST],
                         CONF_PORT: self._pending_target[CONF_PORT],
                     },
@@ -339,7 +521,11 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         return self.async_show_form(
             step_id="monitoring",
             data_schema=self.add_suggested_values_to_schema(
-                _options_schema(_default_options()), suggested
+                _options_schema(
+                    defaults,
+                    _dependency_options(self.hass),
+                ),
+                suggested,
             ),
             errors=errors,
         )
@@ -393,22 +579,37 @@ class ProbulatorOptionsFlow(OptionsFlow):
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
         """Manage target options."""
+        preset_key = str(self.config_entry.data.get(CONF_PRESET, DEFAULT_PRESET))
         errors: dict[str, str] = {}
         suggested = user_input or {
-            **_default_options(),
+            **_default_options(preset_key),
             **dict(self.config_entry.options),
         }
 
         if user_input is not None:
             values, errors = _normalize_options(user_input)
             suggested = values
+            dependency = values[CONF_DEPENDENCY_TARGET_ID]
+            if dependency and _would_create_dependency_cycle(
+                self.hass,
+                self.config_entry,
+                dependency,
+            ):
+                errors[CONF_DEPENDENCY_TARGET_ID] = "dependency_cycle"
             if not errors:
                 return self.async_create_entry(title="", data=values)
 
         return self.async_show_form(
             step_id="init",
             data_schema=self.add_suggested_values_to_schema(
-                _options_schema(dict(self.config_entry.options)), suggested
+                _options_schema(
+                    dict(self.config_entry.options),
+                    _dependency_options(
+                        self.hass,
+                        exclude_entry_id=self.config_entry.entry_id,
+                    ),
+                ),
+                suggested,
             ),
             errors=errors,
         )
