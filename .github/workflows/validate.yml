@@ -11,7 +11,7 @@ permissions:
   contents: read
 
 concurrency:
-  group: validate-v2-${{ github.ref }}
+  group: validate-v4-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
