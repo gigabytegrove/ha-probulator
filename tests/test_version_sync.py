@@ -15,8 +15,7 @@ class VersionSyncTests(unittest.TestCase):
         )
         const_text = (ROOT / "custom_components/ha_probulator/const.py").read_text()
         frontend = (
-            ROOT
-            / "custom_components/ha_probulator/frontend/ha-probulator-cards.js"
+            ROOT / "custom_components/ha_probulator/frontend/ha-probulator-cards.js"
         ).read_text()
 
         const_match = re.search(r'^VERSION = "([^"]+)"$', const_text, re.MULTILINE)
