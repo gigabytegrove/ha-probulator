@@ -14,6 +14,7 @@ Operational intelligence and large-installation polish.
 - Added hidden probe-cycle and queue-wait diagnostic sensors for runtime self-health.
 - Persisted lifetime probe counters, last success/failure, last outage duration, maintenance state, and monitoring enabled state across Home Assistant restarts.
 - Added a status-aware HA Probulator Manager dashboard card with live search, group filtering, and per-target operational controls.
+- Added multi-select bulk Probe, Maintenance, End maintenance, Enable, and Disable operations to the Manager card.
 - Expanded cards for maintenance, disabled, dependency-offline, and unstable states.
 - Added frontend/backend version handshake and a cache-busted resource URL keyed to the integration version.
 - Added reduced-motion support and hostile target-text rendering tests.
