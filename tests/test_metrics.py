@@ -59,6 +59,11 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(recovered["consecutive_failures"], 0)
         self.assertIsNone(recovered["outage_started"])
         self.assertEqual(recovered["last_outage_duration_seconds"], 6.0)
+        self.assertEqual(recovered["outage_count"], 1)
+        self.assertEqual(recovered["total_outage_duration_seconds"], 6.0)
+        self.assertEqual(recovered["longest_outage_duration_seconds"], 6.0)
+        self.assertEqual(recovered["mean_outage_duration_seconds"], 6.0)
+        self.assertEqual(recovered["stable_since"], self.base + timedelta(seconds=6))
 
     def test_current_outage_duration_advances_on_checks(self) -> None:
         self.metrics.record(self.sample(0, False))
@@ -122,6 +127,10 @@ class ProbeMetricsTests(unittest.TestCase):
                 "last_success": self.base.isoformat(),
                 "last_failure": (self.base - timedelta(minutes=1)).isoformat(),
                 "last_outage_duration_seconds": 42.5,
+                "outage_count": 5,
+                "total_outage_duration_seconds": 120.0,
+                "longest_outage_duration_seconds": 50.0,
+                "stable_since": self.base.isoformat(),
             }
         )
         state = restored.snapshot()
@@ -130,6 +139,11 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(state["failed_probes"], 3)
         self.assertEqual(state["last_success"], self.base)
         self.assertEqual(state["last_outage_duration_seconds"], 42.5)
+        self.assertEqual(state["outage_count"], 5)
+        self.assertEqual(state["total_outage_duration_seconds"], 120.0)
+        self.assertEqual(state["longest_outage_duration_seconds"], 50.0)
+        self.assertEqual(state["mean_outage_duration_seconds"], 24.0)
+        self.assertEqual(state["stable_since"], self.base)
 
 
 if __name__ == "__main__":
