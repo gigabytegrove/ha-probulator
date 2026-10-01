@@ -531,6 +531,8 @@ class ProbulatorCard extends HTMLElement {
           <div class="label">Last check</div><div class="value">${esc(fmtTime(a.last_check))}</div>
           <div class="label">Last status change</div><div class="value">${esc(fmtTime(a.last_status_change))}</div>
           ${a.current_outage_duration_seconds != null ? `<div class="label">Current outage</div><div class="value">${esc(Math.round(Number(a.current_outage_duration_seconds)))} s</div>` : ""}
+          ${a.stable_since ? `<div class="label">Stable since</div><div class="value">${esc(fmtTime(a.stable_since))}</div>` : ""}
+          <div class="label">Outages</div><div class="value">${esc(a.outage_count ?? 0)}${a.longest_outage_duration_seconds != null ? ` · longest ${esc(Math.round(Number(a.longest_outage_duration_seconds)))} s` : ""}</div>
           <div class="label">Last success</div><div class="value">${esc(fmtTime(a.last_success))}</div>
           <div class="label">Last failure</div><div class="value">${esc(fmtTime(a.last_failure))}</div>
           ${a.last_error ? `<div class="label">Last error</div><div class="value">${esc(a.last_error)}</div>` : ""}
