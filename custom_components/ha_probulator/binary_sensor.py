@@ -24,7 +24,12 @@ async def async_setup_entry(
 ) -> None:
     """Set up reachability for one target."""
     coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
-    async_add_entities([ProbulatorReachableSensor(coordinator, entry)])
+    async_add_entities(
+        [
+            ProbulatorReachableSensor(coordinator, entry),
+            ProbulatorFlappingSensor(coordinator, entry),
+        ]
+    )
 
 
 class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
@@ -44,6 +49,8 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
     @property
     def is_on(self) -> bool | None:
         """Return debounced reachability."""
+        if not self.coordinator.data.get("monitoring_enabled", True):
+            return None
         return self.coordinator.data.get("reachable")
 
     @property
@@ -65,7 +72,18 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
             "port": data.get("port"),
             "group": data.get("group"),
             "status": data.get("status"),
+            "underlying_status": data.get("underlying_status"),
+            "monitoring_enabled": data.get("monitoring_enabled"),
+            "maintenance": data.get("maintenance"),
+            "maintenance_until": iso("maintenance_until"),
+            "dependency_target_id": data.get("dependency_target_id"),
+            "dependency_name": data.get("dependency_name"),
+            "dependency_status": data.get("dependency_status"),
             "quality": data.get("quality"),
+            "flapping": data.get("flapping"),
+            "flap_transitions": data.get("flap_transitions"),
+            "flap_window": data.get("flap_window"),
+            "flap_threshold": data.get("flap_threshold"),
             "response_time_ms": data.get("response_time_ms"),
             "average_response_time_ms": data.get("average_response_time_ms"),
             "p95_response_time_ms": data.get("p95_response_time_ms"),
@@ -91,6 +109,10 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
             "last_error": data.get("last_error"),
             "attempts": data.get("attempts"),
             "scan_interval": data.get("scan_interval"),
+            "current_scan_interval": data.get("current_scan_interval"),
+            "adaptive_polling": data.get("adaptive_polling"),
+            "degraded_scan_interval": data.get("degraded_scan_interval"),
+            "offline_scan_interval": data.get("offline_scan_interval"),
             "timeout": data.get("timeout"),
             "retries": data.get("retries"),
             "retry_delay": data.get("retry_delay"),
@@ -99,4 +121,29 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
             "warning_latency_ms": data.get("warning_latency_ms"),
             "critical_latency_ms": data.get("critical_latency_ms"),
             "latency_history": data.get("latency_history", []),
+        }
+
+
+class ProbulatorFlappingSensor(ProbulatorEntity, BinarySensorEntity):
+    """Expose rapid success/failure transitions as a native condition."""
+
+    _attr_translation_key = "flapping"
+    _attr_icon = "mdi:pulse"
+
+    def __init__(self, coordinator: ProbulatorCoordinator, entry: ConfigEntry) -> None:
+        super().__init__(coordinator, entry, "flapping")
+
+    @property
+    def is_on(self) -> bool:
+        """Return whether the rolling sample window is flapping."""
+        return bool(self.coordinator.data.get("flapping", False))
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose the flap detector inputs."""
+        data = self.coordinator.data
+        return {
+            "transitions": data.get("flap_transitions"),
+            "window": data.get("flap_window"),
+            "threshold": data.get("flap_threshold"),
         }
