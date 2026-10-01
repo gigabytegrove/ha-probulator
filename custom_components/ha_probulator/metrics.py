@@ -6,6 +6,7 @@ import math
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
+from itertools import pairwise
 from typing import Any
 
 from .const import LATENCY_HISTORY_LIMIT
@@ -155,6 +156,14 @@ class ProbeMetrics:
             rank = max(0, math.ceil(len(ordered) * 0.95) - 1)
             p95 = round(ordered[rank], 3)
 
+        jitter = None
+        if len(successful) >= 2:
+            jitter = round(
+                sum(abs(current - previous) for previous, current in pairwise(successful))
+                / (len(successful) - 1),
+                3,
+            )
+
         success_rate = (
             round((window_successes / window_count) * 100.0, 3)
             if window_count
@@ -185,6 +194,7 @@ class ProbeMetrics:
             "min_response_time_ms": minimum,
             "max_response_time_ms": maximum,
             "p95_response_time_ms": p95,
+            "jitter_ms": jitter,
             "success_rate": success_rate,
             "window_samples": window_count,
             "consecutive_failures": self.consecutive_failures,
