@@ -148,8 +148,7 @@ async def _async_export_config(
         for index, entry in enumerate(entries)
     }
     targets = [
-        _portable_target(entry, index, id_to_ref)
-        for index, entry in enumerate(entries)
+        _portable_target(entry, index, id_to_ref) for index, entry in enumerate(entries)
     ]
     bundle = {
         "format": "ha-probulator",
@@ -185,9 +184,7 @@ async def _async_import_config(
     raw_payload = call.data[ATTR_PAYLOAD]
     try:
         bundle = (
-            json.loads(raw_payload)
-            if isinstance(raw_payload, str)
-            else raw_payload
+            json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
         )
     except json.JSONDecodeError as exc:
         raise ServiceValidationError("Import payload is not valid JSON") from exc
@@ -311,7 +308,6 @@ async def _async_clone_target(
         "name": entry.title,
         "target_id": str(entry.data.get(CONF_TARGET_ID, entry.entry_id)),
     }
-
 
 
 async def _async_suggest_targets(
