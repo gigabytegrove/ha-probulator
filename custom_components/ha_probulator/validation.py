@@ -107,11 +107,32 @@ def normalize_host(value: Any) -> str:
     return ascii_host
 
 
+def probe_cycle_seconds(*, timeout: float, retries: int, retry_delay: float) -> float:
+    """Return the theoretical worst-case duration of a complete probe cycle."""
+    return ((retries + 1) * timeout) + (retries * retry_delay)
+
+
 def validate_probe_budget(*, timeout: float, retries: int, retry_delay: float) -> None:
     """Reject configurations that can monopolize one coordinator for too long."""
-    worst_case = ((retries + 1) * timeout) + (retries * retry_delay)
-    if worst_case > MAX_PROBE_CYCLE_SECONDS:
+    if probe_cycle_seconds(
+        timeout=timeout, retries=retries, retry_delay=retry_delay
+    ) > MAX_PROBE_CYCLE_SECONDS:
         raise ValidationError("probe_budget_too_large")
+
+
+def safe_retries_for_budget(*, timeout: float, retries: int, retry_delay: float) -> int:
+    """Return a retry count that cannot exceed the global probe-cycle budget.
+
+    This protects entries created by older versions before budget validation existed.
+    """
+    safe_retries = max(0, retries)
+    while safe_retries > 0 and probe_cycle_seconds(
+        timeout=timeout,
+        retries=safe_retries,
+        retry_delay=retry_delay,
+    ) > MAX_PROBE_CYCLE_SECONDS:
+        safe_retries -= 1
+    return safe_retries
 
 
 def format_target(host: str, port: int) -> str:
