@@ -8,7 +8,8 @@ from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_PORT
-from homeassistant.core import HomeAssistant
+from homeassistant.core import CoreState, HomeAssistant
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator
 
 from .const import (
@@ -259,6 +260,25 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         dependency_status = self.manager.dependency_status(
             self.dependency_target_id or None
         )
+        issue_id = f"missing_dependency_{self.target_id}"
+        if (
+            self.dependency_target_id
+            and not self.manager.dependency_exists(self.dependency_target_id)
+            and self.hass.state is CoreState.running
+        ):
+            ir.async_create_issue(
+                self.hass,
+                "ha_probulator",
+                issue_id,
+                is_fixable=False,
+                is_persistent=False,
+                severity=ir.IssueSeverity.WARNING,
+                translation_key="missing_dependency",
+                translation_placeholders={"target": self.entry.title},
+            )
+        else:
+            ir.async_delete_issue(self.hass, "ha_probulator", issue_id)
+
         snapshot = self._metadata(
             snapshot,
             monitoring_enabled=monitoring_enabled,
