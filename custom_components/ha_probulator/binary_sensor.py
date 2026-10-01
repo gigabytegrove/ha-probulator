@@ -69,6 +69,7 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
             "response_time_ms": data.get("response_time_ms"),
             "average_response_time_ms": data.get("average_response_time_ms"),
             "p95_response_time_ms": data.get("p95_response_time_ms"),
+            "jitter_ms": data.get("jitter_ms"),
             "min_response_time_ms": data.get("min_response_time_ms"),
             "max_response_time_ms": data.get("max_response_time_ms"),
             "success_rate": data.get("success_rate"),
