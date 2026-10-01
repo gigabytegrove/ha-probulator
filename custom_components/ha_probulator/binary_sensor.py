@@ -47,10 +47,17 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
     def extra_state_attributes(self) -> dict[str, Any]:
         """Expose card/automation-friendly variables."""
         data = self.coordinator.data
+
+        def iso(key: str) -> str | None:
+            value = data.get(key)
+            return value.isoformat() if value is not None else None
+
         return {
             "probulator": True,
             "probulator_kind": "target",
+            "target_id": data.get("target_id"),
             "target_name": self._entry.title,
+            "target": data.get("target"),
             "host": data.get("host"),
             "port": data.get("port"),
             "group": data.get("group"),
@@ -58,25 +65,31 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
             "quality": data.get("quality"),
             "response_time_ms": data.get("response_time_ms"),
             "average_response_time_ms": data.get("average_response_time_ms"),
+            "p95_response_time_ms": data.get("p95_response_time_ms"),
             "min_response_time_ms": data.get("min_response_time_ms"),
             "max_response_time_ms": data.get("max_response_time_ms"),
             "success_rate": data.get("success_rate"),
+            "window_samples": data.get("window_samples"),
             "consecutive_failures": data.get("consecutive_failures"),
             "consecutive_successes": data.get("consecutive_successes"),
             "total_probes": data.get("total_probes"),
             "successful_probes": data.get("successful_probes"),
             "failed_probes": data.get("failed_probes"),
-            "last_success": (
-                data["last_success"].isoformat() if data.get("last_success") else None
+            "last_check": iso("last_check"),
+            "last_status_change": iso("last_status_change"),
+            "last_success": iso("last_success"),
+            "last_failure": iso("last_failure"),
+            "outage_started": iso("outage_started"),
+            "current_outage_duration_seconds": data.get(
+                "current_outage_duration_seconds"
             ),
-            "last_failure": (
-                data["last_failure"].isoformat() if data.get("last_failure") else None
-            ),
+            "last_outage_duration_seconds": data.get("last_outage_duration_seconds"),
             "last_error": data.get("last_error"),
             "attempts": data.get("attempts"),
             "scan_interval": data.get("scan_interval"),
             "timeout": data.get("timeout"),
             "retries": data.get("retries"),
+            "retry_delay": data.get("retry_delay"),
             "failure_threshold": data.get("failure_threshold"),
             "recovery_threshold": data.get("recovery_threshold"),
             "warning_latency_ms": data.get("warning_latency_ms"),
