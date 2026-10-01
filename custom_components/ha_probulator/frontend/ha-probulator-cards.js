@@ -97,14 +97,22 @@ function probulatorTargets(hass, config = {}) {
     ? new Set(config.entities)
     : null;
   const group = String(config.group || "").trim().toLowerCase();
-  return Object.values(hass?.states || {})
+  const targets = Object.values(hass?.states || {})
     .filter((stateObj) => stateObj.entity_id.startsWith("binary_sensor."))
     .filter((stateObj) => stateObj.attributes?.probulator === true)
     .filter((stateObj) => stateObj.attributes?.probulator_kind === "target")
     .filter((stateObj) => !requested || requested.has(stateObj.entity_id))
-    .filter((stateObj) => !group || String(stateObj.attributes?.group || "").toLowerCase() === group)
-    .sort((a, b) => String(a.attributes?.target_name || a.attributes?.friendly_name || a.entity_id)
-      .localeCompare(String(b.attributes?.target_name || b.attributes?.friendly_name || b.entity_id)));
+    .filter((stateObj) => !group || String(stateObj.attributes?.group || "").toLowerCase() === group);
+
+  const byName = (a, b) => String(a.attributes?.target_name || a.attributes?.friendly_name || a.entity_id)
+    .localeCompare(String(b.attributes?.target_name || b.attributes?.friendly_name || b.entity_id));
+  if (config.sort === "name") return targets.sort(byName);
+
+  const rank = { offline: 0, degraded: 1, probing: 2, online: 3 };
+  return targets.sort((a, b) => {
+    const delta = (rank[stateStatus(a)] ?? 9) - (rank[stateStatus(b)] ?? 9);
+    return delta || byName(a, b);
+  });
 }
 
 function fireMoreInfo(element, entityId) {
@@ -195,7 +203,7 @@ class ProbulatorCard extends HTMLElement {
     const status = stateStatus(stateObj);
     const name = this._config.name || a.target_name || a.friendly_name || stateObj.entity_id;
     const icon = this._config.icon || a.icon || "mdi:lan-connect";
-    const hostPort = a.host ? `${a.host}${a.port ? `:${a.port}` : ""}` : "";
+    const hostPort = a.target || (a.host ? `${a.host}${a.port ? `:${a.port}` : ""}` : "");
 
     if (mode === "minimal") {
       this.shadowRoot.innerHTML = `
@@ -214,8 +222,12 @@ class ProbulatorCard extends HTMLElement {
           <div class="label">Target</div><div class="value">${esc(hostPort || "—")}</div>
           <div class="label">Group</div><div class="value">${esc(a.group || "—")}</div>
           <div class="label">Minimum</div><div class="value">${fmtMs(a.min_response_time_ms)}</div>
+          <div class="label">95th percentile</div><div class="value">${fmtMs(a.p95_response_time_ms)}</div>
           <div class="label">Maximum</div><div class="value">${fmtMs(a.max_response_time_ms)}</div>
           <div class="label">Failures</div><div class="value">${esc(a.failed_probes ?? "—")} total / ${esc(a.consecutive_failures ?? 0)} consecutive</div>
+          <div class="label">Last check</div><div class="value">${esc(fmtTime(a.last_check))}</div>
+          <div class="label">Last status change</div><div class="value">${esc(fmtTime(a.last_status_change))}</div>
+          ${a.current_outage_duration_seconds != null ? `<div class="label">Current outage</div><div class="value">${esc(Math.round(Number(a.current_outage_duration_seconds)))} s</div>` : ""}
           <div class="label">Last success</div><div class="value">${esc(fmtTime(a.last_success))}</div>
           <div class="label">Last failure</div><div class="value">${esc(fmtTime(a.last_failure))}</div>
           ${a.last_error ? `<div class="label">Last error</div><div class="value">${esc(a.last_error)}</div>` : ""}
@@ -247,7 +259,10 @@ class ProbulatorCard extends HTMLElement {
     const clickable = this.shadowRoot.querySelector('[role="button"]');
     clickable?.addEventListener("click", () => fireMoreInfo(this, stateObj.entity_id));
     clickable?.addEventListener("keydown", (event) => {
-      if (event.key === "Enter" || event.key === " ") fireMoreInfo(this, stateObj.entity_id);
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        fireMoreInfo(this, stateObj.entity_id);
+      }
     });
   }
 }
@@ -259,11 +274,11 @@ class ProbulatorOverviewCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "HA Probulator", mode: "normal" };
+    return { title: "HA Probulator", sort: "status" };
   }
 
   setConfig(config) {
-    this._config = { title: "HA Probulator", mode: "normal", ...config };
+    this._config = { title: "HA Probulator", sort: "status", ...config };
     applyInlineTheme(this, this._config);
     this._render();
   }
@@ -283,7 +298,7 @@ class ProbulatorOverviewCard extends HTMLElement {
       const a = stateObj.attributes || {};
       const status = stateStatus(stateObj);
       const name = a.target_name || a.friendly_name || stateObj.entity_id;
-      const sub = [a.host && `${a.host}${a.port ? `:${a.port}` : ""}`, a.group].filter(Boolean).join(" · ");
+      const sub = [a.target || (a.host && `${a.host}${a.port ? `:${a.port}` : ""}`), a.group].filter(Boolean).join(" · ");
       return `
         <div class="target-row" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
           <div class="grow"><div class="target-name">${esc(name)}</div><div class="sub">${esc(sub)}</div></div>
@@ -305,7 +320,10 @@ class ProbulatorOverviewCard extends HTMLElement {
       const entityId = row.dataset.entity;
       row.addEventListener("click", () => fireMoreInfo(this, entityId));
       row.addEventListener("keydown", (event) => {
-        if (event.key === "Enter" || event.key === " ") fireMoreInfo(this, entityId);
+        if (event.key === "Enter" || event.key === " ") {
+          event.preventDefault();
+          fireMoreInfo(this, entityId);
+        }
       });
     });
   }
