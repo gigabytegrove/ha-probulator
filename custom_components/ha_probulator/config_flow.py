@@ -48,10 +48,13 @@ from .const import (
     MIN_STATISTICS_WINDOW,
     MIN_TIMEOUT,
 )
-
-
-def _text(value: Any) -> str:
-    return str(value or "").strip()
+from .validation import (
+    ValidationError,
+    normalize_group,
+    normalize_host,
+    normalize_name,
+    validate_probe_budget,
+)
 
 
 def _target_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
@@ -78,18 +81,30 @@ def _target_schema(defaults: dict[str, Any] | None = None) -> vol.Schema:
     )
 
 
+def _default_options() -> dict[str, Any]:
+    return {
+        CONF_GROUP: DEFAULT_GROUP,
+        CONF_ICON: DEFAULT_ICON,
+        CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
+        CONF_TIMEOUT: DEFAULT_TIMEOUT,
+        CONF_RETRIES: DEFAULT_RETRIES,
+        CONF_RETRY_DELAY: DEFAULT_RETRY_DELAY,
+        CONF_FAILURE_THRESHOLD: DEFAULT_FAILURE_THRESHOLD,
+        CONF_RECOVERY_THRESHOLD: DEFAULT_RECOVERY_THRESHOLD,
+        CONF_WARNING_LATENCY: DEFAULT_WARNING_LATENCY,
+        CONF_CRITICAL_LATENCY: DEFAULT_CRITICAL_LATENCY,
+        CONF_STATISTICS_WINDOW: DEFAULT_STATISTICS_WINDOW,
+    }
+
+
 def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
+    merged = {**_default_options(), **defaults}
     return vol.Schema(
         {
-            vol.Optional(
-                CONF_GROUP, default=defaults.get(CONF_GROUP, DEFAULT_GROUP)
-            ): selector.TextSelector(),
+            vol.Optional(CONF_GROUP, default=merged[CONF_GROUP]): selector.TextSelector(),
+            vol.Required(CONF_ICON, default=merged[CONF_ICON]): selector.IconSelector(),
             vol.Required(
-                CONF_ICON, default=defaults.get(CONF_ICON, DEFAULT_ICON)
-            ): selector.IconSelector(),
-            vol.Required(
-                CONF_SCAN_INTERVAL,
-                default=defaults.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL),
+                CONF_SCAN_INTERVAL, default=merged[CONF_SCAN_INTERVAL]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_SCAN_INTERVAL,
@@ -99,9 +114,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required(
-                CONF_TIMEOUT, default=defaults.get(CONF_TIMEOUT, DEFAULT_TIMEOUT)
-            ): selector.NumberSelector(
+            vol.Required(CONF_TIMEOUT, default=merged[CONF_TIMEOUT]): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_TIMEOUT,
                     max=MAX_TIMEOUT,
@@ -110,9 +123,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required(
-                CONF_RETRIES, default=defaults.get(CONF_RETRIES, DEFAULT_RETRIES)
-            ): selector.NumberSelector(
+            vol.Required(CONF_RETRIES, default=merged[CONF_RETRIES]): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=MAX_RETRIES,
@@ -121,8 +132,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_RETRY_DELAY,
-                default=defaults.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY),
+                CONF_RETRY_DELAY, default=merged[CONF_RETRY_DELAY]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
@@ -133,10 +143,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_FAILURE_THRESHOLD,
-                default=defaults.get(
-                    CONF_FAILURE_THRESHOLD, DEFAULT_FAILURE_THRESHOLD
-                ),
+                CONF_FAILURE_THRESHOLD, default=merged[CONF_FAILURE_THRESHOLD]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
@@ -146,10 +153,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_RECOVERY_THRESHOLD,
-                default=defaults.get(
-                    CONF_RECOVERY_THRESHOLD, DEFAULT_RECOVERY_THRESHOLD
-                ),
+                CONF_RECOVERY_THRESHOLD, default=merged[CONF_RECOVERY_THRESHOLD]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
@@ -159,8 +163,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_WARNING_LATENCY,
-                default=defaults.get(CONF_WARNING_LATENCY, DEFAULT_WARNING_LATENCY),
+                CONF_WARNING_LATENCY, default=merged[CONF_WARNING_LATENCY]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
@@ -171,8 +174,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_CRITICAL_LATENCY,
-                default=defaults.get(CONF_CRITICAL_LATENCY, DEFAULT_CRITICAL_LATENCY),
+                CONF_CRITICAL_LATENCY, default=merged[CONF_CRITICAL_LATENCY]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=1,
@@ -183,10 +185,7 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                 )
             ),
             vol.Required(
-                CONF_STATISTICS_WINDOW,
-                default=defaults.get(
-                    CONF_STATISTICS_WINDOW, DEFAULT_STATISTICS_WINDOW
-                ),
+                CONF_STATISTICS_WINDOW, default=merged[CONF_STATISTICS_WINDOW]
             ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_STATISTICS_WINDOW,
@@ -199,28 +198,40 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
     )
 
 
-def _normalize_target_input(user_input: dict[str, Any]) -> dict[str, Any]:
-    return {
-        CONF_NAME: _text(user_input[CONF_NAME]),
-        CONF_HOST: _text(user_input[CONF_HOST]).rstrip("."),
-        CONF_PORT: int(user_input[CONF_PORT]),
-    }
-
-
-def _validate_target(values: dict[str, Any]) -> dict[str, str]:
+def _normalize_target_input(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
     errors: dict[str, str] = {}
-    if not values[CONF_NAME]:
-        errors[CONF_NAME] = "required"
-    host = values[CONF_HOST]
-    if not host or any(char.isspace() for char in host) or "://" in host:
-        errors[CONF_HOST] = "invalid_host"
-    return errors
+    values: dict[str, Any] = {CONF_PORT: int(user_input[CONF_PORT])}
+
+    try:
+        values[CONF_NAME] = normalize_name(user_input[CONF_NAME])
+    except ValidationError as exc:
+        errors[CONF_NAME] = exc.code
+        values[CONF_NAME] = str(user_input.get(CONF_NAME, "")).strip()
+
+    try:
+        values[CONF_HOST] = normalize_host(user_input[CONF_HOST])
+    except ValidationError as exc:
+        errors[CONF_HOST] = exc.code
+        values[CONF_HOST] = str(user_input.get(CONF_HOST, "")).strip()
+
+    return values, errors
 
 
-def _normalize_options(user_input: dict[str, Any]) -> dict[str, Any]:
-    return {
-        CONF_GROUP: _text(user_input.get(CONF_GROUP)),
-        CONF_ICON: _text(user_input.get(CONF_ICON)) or DEFAULT_ICON,
+def _normalize_options(
+    user_input: dict[str, Any],
+) -> tuple[dict[str, Any], dict[str, str]]:
+    errors: dict[str, str] = {}
+    try:
+        group = normalize_group(user_input.get(CONF_GROUP))
+    except ValidationError as exc:
+        errors[CONF_GROUP] = exc.code
+        group = str(user_input.get(CONF_GROUP, "")).strip()
+
+    values = {
+        CONF_GROUP: group,
+        CONF_ICON: str(user_input.get(CONF_ICON) or DEFAULT_ICON).strip(),
         CONF_SCAN_INTERVAL: int(user_input[CONF_SCAN_INTERVAL]),
         CONF_TIMEOUT: float(user_input[CONF_TIMEOUT]),
         CONF_RETRIES: int(user_input[CONF_RETRIES]),
@@ -232,11 +243,28 @@ def _normalize_options(user_input: dict[str, Any]) -> dict[str, Any]:
         CONF_STATISTICS_WINDOW: int(user_input[CONF_STATISTICS_WINDOW]),
     }
 
+    if values[CONF_CRITICAL_LATENCY] <= values[CONF_WARNING_LATENCY]:
+        errors[CONF_CRITICAL_LATENCY] = "critical_must_exceed_warning"
+
+    try:
+        validate_probe_budget(
+            timeout=values[CONF_TIMEOUT],
+            retries=values[CONF_RETRIES],
+            retry_delay=values[CONF_RETRY_DELAY],
+        )
+    except ValidationError as exc:
+        errors["base"] = exc.code
+
+    return values, errors
+
 
 class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     """Handle HA Probulator config entries."""
 
     VERSION = 1
+
+    def __init__(self) -> None:
+        self._pending_target: dict[str, Any] | None = None
 
     @staticmethod
     @callback
@@ -249,48 +277,62 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     async def async_step_user(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
-        """Create a new monitored target."""
+        """Collect a new monitored target."""
         errors: dict[str, str] = {}
-        suggested = user_input
+        suggested = user_input or {}
 
         if user_input is not None:
-            values = _normalize_target_input(user_input)
+            values, errors = _normalize_target_input(user_input)
             suggested = values
-            errors = _validate_target(values)
             if not errors:
                 self._async_abort_entries_match(
                     {CONF_HOST: values[CONF_HOST], CONF_PORT: values[CONF_PORT]}
                 )
-                target_id = uuid4().hex
-                await self.async_set_unique_id(target_id)
-                return self.async_create_entry(
-                    title=values[CONF_NAME],
-                    data={
-                        CONF_TARGET_ID: target_id,
-                        CONF_HOST: values[CONF_HOST],
-                        CONF_PORT: values[CONF_PORT],
-                    },
-                    options=_normalize_options(
-                        {
-                            CONF_GROUP: DEFAULT_GROUP,
-                            CONF_ICON: DEFAULT_ICON,
-                            CONF_SCAN_INTERVAL: DEFAULT_SCAN_INTERVAL,
-                            CONF_TIMEOUT: DEFAULT_TIMEOUT,
-                            CONF_RETRIES: DEFAULT_RETRIES,
-                            CONF_RETRY_DELAY: DEFAULT_RETRY_DELAY,
-                            CONF_FAILURE_THRESHOLD: DEFAULT_FAILURE_THRESHOLD,
-                            CONF_RECOVERY_THRESHOLD: DEFAULT_RECOVERY_THRESHOLD,
-                            CONF_WARNING_LATENCY: DEFAULT_WARNING_LATENCY,
-                            CONF_CRITICAL_LATENCY: DEFAULT_CRITICAL_LATENCY,
-                            CONF_STATISTICS_WINDOW: DEFAULT_STATISTICS_WINDOW,
-                        }
-                    ),
-                )
+                self._pending_target = values
+                return await self.async_step_monitoring()
 
         return self.async_show_form(
             step_id="user",
+            data_schema=self.add_suggested_values_to_schema(_target_schema(), suggested),
+            errors=errors,
+        )
+
+    async def async_step_monitoring(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Configure monitoring behavior before creating the target."""
+        if self._pending_target is None:
+            return self.async_abort(reason="setup_incomplete")
+
+        errors: dict[str, str] = {}
+        suggested = user_input or _default_options()
+
+        if user_input is not None:
+            values, errors = _normalize_options(user_input)
+            suggested = values
+            if not errors:
+                self._async_abort_entries_match(
+                    {
+                        CONF_HOST: self._pending_target[CONF_HOST],
+                        CONF_PORT: self._pending_target[CONF_PORT],
+                    }
+                )
+                target_id = uuid4().hex
+                await self.async_set_unique_id(target_id)
+                return self.async_create_entry(
+                    title=self._pending_target[CONF_NAME],
+                    data={
+                        CONF_TARGET_ID: target_id,
+                        CONF_HOST: self._pending_target[CONF_HOST],
+                        CONF_PORT: self._pending_target[CONF_PORT],
+                    },
+                    options=values,
+                )
+
+        return self.async_show_form(
+            step_id="monitoring",
             data_schema=self.add_suggested_values_to_schema(
-                _target_schema(), suggested or {}
+                _options_schema(_default_options()), suggested
             ),
             errors=errors,
         )
@@ -309,13 +351,16 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         suggested = user_input or defaults
 
         if user_input is not None:
-            values = _normalize_target_input(user_input)
+            values, errors = _normalize_target_input(user_input)
             suggested = values
-            errors = _validate_target(values)
             if not errors:
-                self._async_abort_entries_match(
-                    {CONF_HOST: values[CONF_HOST], CONF_PORT: values[CONF_PORT]}
-                )
+                if (
+                    values[CONF_HOST] != entry.data[CONF_HOST]
+                    or values[CONF_PORT] != entry.data[CONF_PORT]
+                ):
+                    self._async_abort_entries_match(
+                        {CONF_HOST: values[CONF_HOST], CONF_PORT: values[CONF_PORT]}
+                    )
                 return self.async_update_and_abort(
                     entry,
                     title=values[CONF_NAME],
@@ -342,13 +387,11 @@ class ProbulatorOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage target options."""
         errors: dict[str, str] = {}
-        suggested = user_input or dict(self.config_entry.options)
+        suggested = user_input or {**_default_options(), **dict(self.config_entry.options)}
 
         if user_input is not None:
-            values = _normalize_options(user_input)
+            values, errors = _normalize_options(user_input)
             suggested = values
-            if values[CONF_CRITICAL_LATENCY] <= values[CONF_WARNING_LATENCY]:
-                errors[CONF_CRITICAL_LATENCY] = "critical_must_exceed_warning"
             if not errors:
                 return self.async_create_entry(title="", data=values)
 
