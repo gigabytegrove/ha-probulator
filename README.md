@@ -172,6 +172,18 @@ latency_history
 
 `probulator: true` and `probulator_kind: target` are also exposed so cards can safely discover HA Probulator targets without relying on entity naming.
 
+## Native group and overall health
+
+HA Probulator automatically creates virtual aggregate devices for **Overall** and for every non-empty target group. Each aggregate device exposes normal Home Assistant entities:
+
+```text
+binary_sensor.ha_probulator_overall_healthy
+sensor.ha_probulator_overall_availability
+sensor.ha_probulator_overall_average_response_time
+```
+
+Named groups receive the same three entities. Group health ignores targets intentionally placed in Maintenance or disabled monitoring, while still exposing those counts as attributes. Availability is the average rolling success rate of active group members.
+
 ## Built-in Home Assistant cards
 
 Custom cards are optional. HA Probulator works normally with built-in Home Assistant cards.
@@ -368,8 +380,24 @@ HA Probulator registers administrator-only actions:
 - `ha_probulator.set_monitoring`
 - `ha_probulator.start_maintenance`
 - `ha_probulator.end_maintenance`
+- `ha_probulator.clone_target`
+- `ha_probulator.export_config`
+- `ha_probulator.import_config`
+- `ha_probulator.suggest_targets`
 
 Each action can target a stable Probulator target ID, a group, or—when both are omitted—all loaded targets.
+
+### Portable configuration
+
+`ha_probulator.export_config` returns both a structured bundle and formatted JSON. The bundle excludes Home Assistant config-entry IDs and uses temporary portable references for dependency relationships.
+
+`ha_probulator.import_config` recreates targets through the same hardened config flow used by manual setup, generates fresh local target IDs, and reconnects dependency relationships after creation.
+
+`ha_probulator.clone_target` copies one target's monitoring behavior to a new name/host/port while deliberately clearing the dependency until you explicitly choose one.
+
+### Safe target suggestions
+
+`ha_probulator.suggest_targets` inspects host/IP-like attributes already present in Home Assistant state data and returns candidate targets. It **does not scan the LAN, sweep ports, or open any connection**. Suggestions indicate whether the exact host/port is already monitored.
 
 ## Automations and templates
 
