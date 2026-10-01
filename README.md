@@ -24,6 +24,8 @@ The name is intentionally a little ridiculous. The monitoring is not.
 
 ## Installation
 
+[![Open your Home Assistant instance and open HA Probulator in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=gigabytegrove&repository=ha-probulator&category=integration)
+
 ### HACS custom repository
 
 1. In HACS, open **Integrations**.
