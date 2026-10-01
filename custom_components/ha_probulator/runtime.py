@@ -142,6 +142,27 @@ class ProbulatorRuntimeManager:
         if coordinator := self._coordinators.get(target_id):
             await coordinator.async_request_refresh()
 
+    def dependency_name(self, target_id: str | None) -> str | None:
+        """Return a dependency target's friendly name."""
+        if not target_id:
+            return None
+        coordinator = self._coordinators.get(target_id)
+        return coordinator.entry.title if coordinator is not None else None
+
+    def dependency_exists(self, target_id: str | None) -> bool:
+        """Return whether a dependency target is currently loaded."""
+        return not target_id or target_id in self._coordinators
+
+    def notify_dependents(self, target_id: str) -> None:
+        """Refresh dependents when an upstream effective status changes."""
+        for coordinator in self._coordinators.values():
+            if coordinator.dependency_target_id != target_id:
+                continue
+            self.hass.async_create_task(
+                coordinator.async_request_refresh(),
+                f"HA Probulator dependency refresh: {coordinator.entry.title}",
+            )
+
     def dependency_status(self, target_id: str | None) -> str | None:
         """Return the effective status for a dependency target."""
         if not target_id:
