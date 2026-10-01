@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import timedelta
 import logging
+from datetime import timedelta
 from typing import Any
 
 from homeassistant.config_entries import ConfigEntry
@@ -54,7 +54,9 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.host = str(entry.data[CONF_HOST])
         self.port = int(entry.data[CONF_PORT])
         self.group = str(entry.options.get(CONF_GROUP, DEFAULT_GROUP)).strip()
-        self.icon = str(entry.options.get(CONF_ICON, DEFAULT_ICON)).strip() or DEFAULT_ICON
+        self.icon = (
+            str(entry.options.get(CONF_ICON, DEFAULT_ICON)).strip() or DEFAULT_ICON
+        )
         self.timeout = float(entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
         configured_retries = int(entry.options.get(CONF_RETRIES, DEFAULT_RETRIES))
         self.retry_delay = float(
@@ -98,7 +100,9 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             config_entry=entry,
             name=f"{NAME}: {entry.title}",
             update_interval=timedelta(
-                seconds=int(entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL))
+                seconds=int(
+                    entry.options.get(CONF_SCAN_INTERVAL, DEFAULT_SCAN_INTERVAL)
+                )
             ),
         )
 
