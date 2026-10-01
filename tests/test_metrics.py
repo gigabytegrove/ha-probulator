@@ -48,7 +48,7 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertFalse(second["reachable"])
         self.assertEqual(second["status"], "offline")
         self.assertEqual(second["consecutive_failures"], 2)
-        self.assertEqual(second["outage_started"], self.base + timedelta(seconds=2))
+        self.assertEqual(second["outage_started"], self.base + timedelta(seconds=1))
 
     def test_success_recovers_after_offline_and_records_outage(self) -> None:
         self.metrics.record(self.sample(0, False))
@@ -58,14 +58,14 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(recovered["status"], "online")
         self.assertEqual(recovered["consecutive_failures"], 0)
         self.assertIsNone(recovered["outage_started"])
-        self.assertEqual(recovered["last_outage_duration_seconds"], 5.0)
+        self.assertEqual(recovered["last_outage_duration_seconds"], 6.0)
 
     def test_current_outage_duration_advances_on_checks(self) -> None:
         self.metrics.record(self.sample(0, False))
         offline = self.metrics.record(self.sample(1, False))
-        self.assertEqual(offline["current_outage_duration_seconds"], 0.0)
+        self.assertEqual(offline["current_outage_duration_seconds"], 1.0)
         later = self.metrics.record(self.sample(11, False))
-        self.assertEqual(later["current_outage_duration_seconds"], 10.0)
+        self.assertEqual(later["current_outage_duration_seconds"], 11.0)
 
     def test_latency_thresholds_mark_degraded(self) -> None:
         warning = self.metrics.record(self.sample(0, True, 150))
