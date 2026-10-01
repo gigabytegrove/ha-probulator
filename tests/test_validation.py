@@ -67,6 +67,14 @@ class ValidationTests(unittest.TestCase):
             1,
         )
 
+    def test_flap_threshold_must_fit_window(self) -> None:
+        validation.validate_flap_settings(window=10, threshold=4)
+        with self.assertRaisesRegex(
+            validation.ValidationError,
+            "flap_threshold_too_high",
+        ):
+            validation.validate_flap_settings(window=4, threshold=4)
+
 
 if __name__ == "__main__":
     unittest.main()
