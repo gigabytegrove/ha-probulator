@@ -46,6 +46,24 @@ class ValidationTests(unittest.TestCase):
         ):
             validation.validate_probe_budget(timeout=30, retries=5, retry_delay=5)
 
+    def test_legacy_retry_count_is_reduced_to_budget(self) -> None:
+        self.assertEqual(
+            validation.safe_retries_for_budget(
+                timeout=30,
+                retries=5,
+                retry_delay=5,
+            ),
+            0,
+        )
+        self.assertEqual(
+            validation.safe_retries_for_budget(
+                timeout=3,
+                retries=1,
+                retry_delay=0.25,
+            ),
+            1,
+        )
+
 
 if __name__ == "__main__":
     unittest.main()
