@@ -69,3 +69,52 @@ end_maintenance:
       name: Group
       selector:
         text:
+
+clone_target:
+  name: Clone target
+  description: Create a new target using another HA Probulator target's monitoring settings.
+  fields:
+    source_target_id:
+      name: Source target ID
+      required: true
+      description: Stable HA Probulator target ID to copy settings from.
+      selector:
+        text:
+    name:
+      name: New target name
+      required: true
+      selector:
+        text:
+    host:
+      name: New host or IP address
+      required: true
+      selector:
+        text:
+    port:
+      name: New TCP port
+      description: Leave blank to reuse the source target's port.
+      selector:
+        number:
+          min: 1
+          max: 65535
+          step: 1
+          mode: box
+
+export_config:
+  name: Export configuration
+  description: Return a portable HA Probulator configuration bundle and formatted JSON.
+  response:
+    optional: false
+
+import_config:
+  name: Import configuration
+  description: Import targets from a portable HA Probulator export bundle using normal config-flow validation.
+  fields:
+    payload:
+      name: Import payload
+      required: true
+      description: JSON text or a parsed HA Probulator export object.
+      selector:
+        object:
+  response:
+    optional: false
