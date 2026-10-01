@@ -197,6 +197,10 @@ class ProbulatorRuntimeManager:
             ]
         return list(self._coordinators.values())
 
+    def runtime_snapshot(self, target_id: str) -> dict[str, Any]:
+        """Return a copy of persistent runtime state for diagnostics."""
+        return dict(self._state(target_id))
+
     def restore_metrics(self, target_id: str) -> dict[str, Any]:
         """Return the persisted metric subset for a target."""
         state = self._state(target_id)
