@@ -179,7 +179,7 @@ stat_types:
 
 ## Custom cards
 
-The dashboard card bundle is shipped inside the integration and registered automatically when Home Assistant loads HA Probulator. No separate card repository is required.
+The dashboard card bundle is shipped inside the integration and registered automatically when Home Assistant loads HA Probulator. No separate card repository is required. All three cards now include visual Home Assistant card editors, so their common settings can be configured from the dashboard UI instead of requiring YAML.
 
 ### Target card
 
@@ -195,6 +195,8 @@ Supported modes:
 - `normal` — status plus current/average response time and success rate.
 - `extended` — the full target view, including host/port, group, min/p95/max response time, failure information, last check/status change, outage duration, timestamps, sanitized last-error category, and a recent latency sparkline.
 
+The visual editor can select the target, mode, icon/name overrides, individual metric visibility, sparkline visibility, and common theme overrides.
+
 Optional presentation overrides:
 
 ```yaml
@@ -203,6 +205,11 @@ entity: binary_sensor.core_router_reachable
 mode: extended
 name: Internet Edge
 icon: mdi:router-network
+show_response: true
+show_average: true
+show_success: true
+show_p95: true
+show_sparkline: true
 online_color: "#00c853"
 degraded_color: "#ffab00"
 offline_color: "#d50000"
