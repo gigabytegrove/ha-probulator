@@ -26,6 +26,10 @@ _PERSISTED_METRIC_KEYS = (
     "last_success",
     "last_failure",
     "last_outage_duration_seconds",
+    "outage_count",
+    "total_outage_duration_seconds",
+    "longest_outage_duration_seconds",
+    "stable_since",
 )
 
 
