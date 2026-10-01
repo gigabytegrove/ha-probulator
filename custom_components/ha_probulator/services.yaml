@@ -1,0 +1,71 @@
+probe:
+  name: Probe targets
+  description: Immediately probe one target, one group, or every HA Probulator target.
+  fields:
+    target_id:
+      name: Target ID
+      description: Stable HA Probulator target ID. Leave blank to use a group or all targets.
+      example: "0123456789abcdef0123456789abcdef"
+      selector:
+        text:
+    group:
+      name: Group
+      description: Probe all targets in this group. Leave both fields blank to probe everything.
+      example: "Core Network"
+      selector:
+        text:
+
+set_monitoring:
+  name: Set monitoring
+  description: Enable or disable active probing without deleting targets.
+  fields:
+    target_id:
+      name: Target ID
+      selector:
+        text:
+    group:
+      name: Group
+      selector:
+        text:
+    enabled:
+      name: Enabled
+      required: true
+      selector:
+        boolean:
+
+start_maintenance:
+  name: Start maintenance
+  description: Suppress operational status transitions while continuing to collect probe data.
+  fields:
+    target_id:
+      name: Target ID
+      selector:
+        text:
+    group:
+      name: Group
+      selector:
+        text:
+    duration_minutes:
+      name: Duration
+      description: Minutes before maintenance ends automatically. Zero means indefinite.
+      default: 0
+      selector:
+        number:
+          min: 0
+          max: 10080
+          step: 1
+          unit_of_measurement: min
+          mode: box
+
+end_maintenance:
+  name: End maintenance
+  description: End maintenance for one target, one group, or all targets.
+  fields:
+    target_id:
+      name: Target ID
+      selector:
+        text:
+    group:
+      name: Group
+      selector:
+        text:
