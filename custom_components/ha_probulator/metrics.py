@@ -159,7 +159,10 @@ class ProbeMetrics:
         jitter = None
         if len(successful) >= 2:
             jitter = round(
-                sum(abs(current - previous) for previous, current in pairwise(successful))
+                sum(
+                    abs(current - previous)
+                    for previous, current in pairwise(successful)
+                )
                 / (len(successful) - 1),
                 3,
             )
