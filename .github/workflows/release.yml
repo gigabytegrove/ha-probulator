@@ -51,6 +51,7 @@ jobs:
           python -m json.tool custom_components/ha_probulator/translations/en.json >/dev/null
           python -m json.tool hacs.json >/dev/null
           node --check custom_components/ha_probulator/frontend/ha-probulator-cards.js
+          node tests/frontend_smoke.mjs
 
       - name: Build deterministic release archive
         run: |
