@@ -9,7 +9,11 @@ from datetime import datetime
 from itertools import pairwise
 from typing import Any
 
-from .const import LATENCY_HISTORY_LIMIT
+from .const import (
+    DEFAULT_FLAP_THRESHOLD,
+    DEFAULT_FLAP_WINDOW,
+    LATENCY_HISTORY_LIMIT,
+)
 from .probe import ProbeSample
 
 
@@ -31,12 +35,16 @@ class ProbeMetrics:
         recovery_threshold: int,
         warning_latency_ms: float,
         critical_latency_ms: float,
+        flap_window: int = DEFAULT_FLAP_WINDOW,
+        flap_threshold: int = DEFAULT_FLAP_THRESHOLD,
     ) -> None:
         self._samples: deque[_ObservedSample] = deque(maxlen=window_size)
         self.failure_threshold = failure_threshold
         self.recovery_threshold = recovery_threshold
         self.warning_latency_ms = warning_latency_ms
         self.critical_latency_ms = critical_latency_ms
+        self.flap_window = flap_window
+        self.flap_threshold = flap_threshold
 
         self.reachable: bool | None = None
         self.consecutive_failures = 0
@@ -61,11 +69,48 @@ class ProbeMetrics:
             return "offline"
         if self.reachable is None:
             return "probing"
+        if self.flapping:
+            return "unstable"
         if self.latest is not None and not self.latest.success:
             return "degraded"
         if self.quality in {"warning", "critical"}:
             return "degraded"
         return "online"
+
+    @property
+    def flap_transitions(self) -> int:
+        """Return success/failure transitions inside the configured flap window."""
+        recent = list(self._samples)[-self.flap_window :]
+        if len(recent) < 2:
+            return 0
+        return sum(
+            previous.success != current.success
+            for previous, current in pairwise(recent)
+        )
+
+    @property
+    def flapping(self) -> bool:
+        """Return whether the target is changing state unusually often."""
+        return self.flap_transitions >= self.flap_threshold
+
+    def restore_persistent(self, data: dict[str, Any]) -> None:
+        """Restore low-churn lifetime metadata from persistent storage."""
+        self.total_probes = int(data.get("total_probes") or 0)
+        self.successful_probes = int(data.get("successful_probes") or 0)
+        self.failed_probes = int(data.get("failed_probes") or 0)
+        self.last_outage_duration_seconds = data.get(
+            "last_outage_duration_seconds"
+        )
+
+        for key in ("last_success", "last_failure"):
+            raw = data.get(key)
+            if not raw:
+                continue
+            try:
+                value = datetime.fromisoformat(str(raw))
+            except ValueError:
+                continue
+            setattr(self, key, value)
 
     @property
     def quality(self) -> str:
@@ -192,6 +237,10 @@ class ProbeMetrics:
             "reachable": self.reachable,
             "status": self.status,
             "quality": self.quality,
+            "flapping": self.flapping,
+            "flap_transitions": self.flap_transitions,
+            "flap_window": self.flap_window,
+            "flap_threshold": self.flap_threshold,
             "response_time_ms": self.latest.latency_ms if self.latest else None,
             "average_response_time_ms": average,
             "min_response_time_ms": minimum,
