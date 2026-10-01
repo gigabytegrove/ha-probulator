@@ -60,7 +60,10 @@ const PROBULATOR_STYLE = `
   .pill.disabled { color:var(--probulator-disabled-color); }
   .manager-toolbar { display:grid; grid-template-columns:minmax(0,1fr) minmax(140px,220px); gap:10px; margin:14px 0; }
   .manager-input, .manager-select { box-sizing:border-box; width:100%; min-height:40px; border:1px solid var(--divider-color); border-radius:10px; background:var(--card-background-color); color:var(--primary-text-color); padding:8px 10px; font:inherit; }
-  .manager-row { display:grid; grid-template-columns:minmax(0,1.5fr) minmax(90px,.6fr) minmax(78px,.5fr) minmax(170px,.9fr); gap:12px; align-items:center; padding:11px 0; border-top:1px solid var(--divider-color); }
+  .manager-row { display:grid; grid-template-columns:auto minmax(0,1.5fr) minmax(90px,.6fr) minmax(78px,.5fr) minmax(170px,.9fr); gap:12px; align-items:center; padding:11px 0; border-top:1px solid var(--divider-color); }
+  .manager-check { width:18px; height:18px; accent-color:var(--primary-color); }
+  .manager-bulk { display:flex; gap:7px; align-items:center; flex-wrap:wrap; margin:0 0 12px; }
+  .manager-bulk-count { color:var(--secondary-text-color); font-size:.78rem; margin-right:auto; }
   .manager-row[hidden] { display:none; }
   .manager-metrics { color:var(--secondary-text-color); font-size:.8rem; line-height:1.45; }
   .manager-actions { display:flex; justify-content:flex-end; gap:6px; flex-wrap:wrap; }
@@ -83,9 +86,9 @@ const PROBULATOR_STYLE = `
     .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
     .manager-toolbar { grid-template-columns:1fr; }
-    .manager-row { grid-template-columns:minmax(0,1fr) auto; }
+    .manager-row { grid-template-columns:auto minmax(0,1fr) auto; }
     .manager-metrics { display:none; }
-    .manager-actions { grid-column:1 / -1; justify-content:flex-start; }
+    .manager-actions { grid-column:2 / -1; justify-content:flex-start; }
   }
 `;
 
@@ -382,6 +385,7 @@ class ProbulatorManagerEditor extends ProbulatorFormEditor {
       title: "HA Probulator Manager",
       sort: "status",
       show_actions: true,
+      show_bulk_actions: true,
       ...config,
     });
   }
@@ -393,6 +397,7 @@ class ProbulatorManagerEditor extends ProbulatorFormEditor {
       { name: "group", selector: { text: {} } },
       { name: "sort", selector: { select: { options: ["status", "name"], mode: "dropdown" } } },
       { name: "show_actions", selector: { boolean: {} } },
+      { name: "show_bulk_actions", selector: { boolean: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
       { name: "offline_color", selector: { text: {} } },
@@ -405,6 +410,7 @@ class ProbulatorManagerEditor extends ProbulatorFormEditor {
       group: "Fixed group filter",
       sort: "Sort order",
       show_actions: "Show target actions",
+      show_bulk_actions: "Show multi-select bulk actions",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
       offline_color: "Offline color (CSS value)",
@@ -714,6 +720,7 @@ class ProbulatorManagerCard extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._search = "";
     this._runtimeGroup = "";
+    this._selected = new Set();
   }
 
   static getStubConfig() {
@@ -721,6 +728,7 @@ class ProbulatorManagerCard extends HTMLElement {
       title: "HA Probulator Manager",
       sort: "status",
       show_actions: true,
+      show_bulk_actions: true,
     };
   }
 
@@ -777,6 +785,37 @@ class ProbulatorManagerCard extends HTMLElement {
     }
   }
 
+
+  async _runBulkAction(action) {
+    if (!this._selected.size) return;
+    await Promise.all(
+      [...this._selected].map((targetId) => this._runAction(action, targetId))
+    );
+  }
+
+  _updateBulkState() {
+    const count = this.shadowRoot?.querySelector(".manager-bulk-count");
+    if (count) {
+      count.textContent = `${this._selected.size} selected`;
+    }
+    this.shadowRoot?.querySelectorAll(".manager-bulk-action").forEach((button) => {
+      button.disabled = this._selected.size === 0;
+    });
+  }
+
+  _selectVisible(select) {
+    this.shadowRoot?.querySelectorAll(".manager-row").forEach((row) => {
+      if (row.hidden) return;
+      const checkbox = row.querySelector(".manager-check");
+      const targetId = checkbox?.dataset.target;
+      if (!targetId) return;
+      checkbox.checked = select;
+      if (select) this._selected.add(targetId);
+      else this._selected.delete(targetId);
+    });
+    this._updateBulkState();
+  }
+
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
     const targets = probulatorTargets(this._hass, { sort: this._config.sort });
@@ -798,8 +837,10 @@ class ProbulatorManagerCard extends HTMLElement {
           <button class="manager-action" type="button" data-action="${maintenance ? "maintenance-off" : "maintenance-on"}" data-target="${esc(a.target_id)}">${maintenance ? "End maintenance" : "Maintenance"}</button>
           <button class="manager-action" type="button" data-action="${monitoring ? "monitoring-off" : "monitoring-on"}" data-target="${esc(a.target_id)}">${monitoring ? "Disable" : "Enable"}</button>
         </div>`;
+      const checked = this._selected.has(String(a.target_id || "")) ? "checked" : "";
       return `
         <div class="manager-row" data-search="${esc(search)}" data-group="${esc(String(a.group || "").toLowerCase())}">
+          <input class="manager-check" type="checkbox" aria-label="Select ${esc(name)}" data-target="${esc(a.target_id)}" ${checked}>
           <div class="manager-info" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
             <div class="target-name">${esc(name)}</div>
             <div class="sub">${esc(a.target || "")}${a.group ? ` · ${esc(a.group)}` : ""}${a.dependency_name ? ` · depends on ${esc(a.dependency_name)}` : ""}</div>
@@ -833,6 +874,17 @@ class ProbulatorManagerCard extends HTMLElement {
             <input class="manager-input" type="search" aria-label="Search HA Probulator targets" placeholder="Search targets, addresses, groups, states…" value="${esc(this._search)}">
             ${groupControl}
           </div>
+          ${this._config.show_bulk_actions === false ? "" : `
+          <div class="manager-bulk">
+            <span class="manager-bulk-count">0 selected</span>
+            <button class="manager-action manager-select-visible" type="button">Select visible</button>
+            <button class="manager-action manager-clear-selection" type="button">Clear</button>
+            <button class="manager-action manager-bulk-action" type="button" data-action="probe">Probe</button>
+            <button class="manager-action manager-bulk-action" type="button" data-action="maintenance-on">Maintenance</button>
+            <button class="manager-action manager-bulk-action" type="button" data-action="maintenance-off">End maintenance</button>
+            <button class="manager-action manager-bulk-action" type="button" data-action="monitoring-on">Enable</button>
+            <button class="manager-action manager-bulk-action" type="button" data-action="monitoring-off">Disable</button>
+          </div>`}
           <div class="targets">${rows || '<div class="empty">No HA Probulator targets are available.</div>'}</div>
           <div class="manager-count"></div>
         </div>
@@ -847,6 +899,36 @@ class ProbulatorManagerCard extends HTMLElement {
     group?.addEventListener("change", (event) => {
       this._runtimeGroup = event.target.value || "";
       this._applyFilter();
+    });
+
+    this.shadowRoot.querySelectorAll(".manager-check").forEach((checkbox) => {
+      checkbox.addEventListener("change", () => {
+        const targetId = checkbox.dataset.target;
+        if (!targetId) return;
+        if (checkbox.checked) this._selected.add(targetId);
+        else this._selected.delete(targetId);
+        this._updateBulkState();
+      });
+    });
+    this.shadowRoot.querySelector(".manager-select-visible")?.addEventListener("click", () => {
+      this._selectVisible(true);
+    });
+    this.shadowRoot.querySelector(".manager-clear-selection")?.addEventListener("click", () => {
+      this._selected.clear();
+      this.shadowRoot.querySelectorAll(".manager-check").forEach((checkbox) => {
+        checkbox.checked = false;
+      });
+      this._updateBulkState();
+    });
+    this.shadowRoot.querySelectorAll(".manager-bulk-action").forEach((button) => {
+      button.addEventListener("click", async () => {
+        button.disabled = true;
+        try {
+          await this._runBulkAction(button.dataset.action);
+        } finally {
+          this._updateBulkState();
+        }
+      });
     });
 
     this.shadowRoot.querySelectorAll(".manager-info").forEach((item) => {
@@ -873,6 +955,7 @@ class ProbulatorManagerCard extends HTMLElement {
     });
 
     this._applyFilter();
+    this._updateBulkState();
   }
 }
 
