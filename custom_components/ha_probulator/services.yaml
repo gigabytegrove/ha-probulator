@@ -118,3 +118,9 @@ import_config:
         object:
   response:
     optional: false
+
+suggest_targets:
+  name: Suggest targets
+  description: Return possible monitoring targets from host/IP attributes Home Assistant already knows. This performs no subnet or port scan.
+  response:
+    optional: false
