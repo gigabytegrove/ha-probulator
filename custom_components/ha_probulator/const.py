@@ -78,6 +78,7 @@ SERVICE_END_MAINTENANCE = "end_maintenance"
 SERVICE_CLONE_TARGET = "clone_target"
 SERVICE_EXPORT_CONFIG = "export_config"
 SERVICE_IMPORT_CONFIG = "import_config"
+SERVICE_SUGGEST_TARGETS = "suggest_targets"
 
 CARD_PATH = "/ha_probulator/ha-probulator-cards.js"
 CARD_FILE = "ha-probulator-cards.js"
