@@ -1,0 +1,56 @@
+name: Bug report
+description: Report reproducible HA Probulator behavior
+title: "[Bug] "
+labels:
+  - "bug"
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please remove private hostnames, IP addresses, and unrelated Home Assistant configuration before posting.
+  - type: input
+    id: ha_version
+    attributes:
+      label: Home Assistant version
+    validations:
+      required: true
+  - type: input
+    id: probulator_version
+    attributes:
+      label: HA Probulator version
+    validations:
+      required: true
+  - type: dropdown
+    id: target_scope
+    attributes:
+      label: Target scope
+      options:
+        - LAN
+        - WAN / Internet
+        - Local hostname / DNS
+        - Other
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behavior
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Relevant diagnostics or logs
+      description: HA Probulator diagnostics redact the configured host/target, but review pasted content before submitting.
