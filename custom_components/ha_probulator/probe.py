@@ -3,11 +3,12 @@
 from __future__ import annotations
 
 import asyncio
-from dataclasses import dataclass
-from datetime import datetime, timezone
-from enum import StrEnum
 import errno
 import socket
+from contextlib import suppress
+from dataclasses import dataclass
+from datetime import UTC, datetime
+from enum import StrEnum
 
 
 class ProbeError(StrEnum):
@@ -91,7 +92,7 @@ async def async_tcp_probe(
             )
             latency_ms = round((loop.time() - started) * 1000.0, 3)
             return ProbeSample(
-                timestamp=datetime.now(timezone.utc),
+                timestamp=datetime.now(UTC),
                 success=True,
                 latency_ms=latency_ms,
                 attempts=attempt,
@@ -103,16 +104,14 @@ async def async_tcp_probe(
         finally:
             if writer is not None:
                 writer.close()
-                try:
+                with suppress(ConnectionError, OSError):
                     await writer.wait_closed()
-                except (ConnectionError, OSError):
-                    pass
 
         if attempt < attempts and retry_delay > 0:
             await asyncio.sleep(retry_delay)
 
     return ProbeSample(
-        timestamp=datetime.now(timezone.utc),
+        timestamp=datetime.now(UTC),
         success=False,
         latency_ms=None,
         attempts=attempts,
