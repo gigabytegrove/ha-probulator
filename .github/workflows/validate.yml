@@ -41,6 +41,8 @@ jobs:
           python -m json.tool hacs.json >/dev/null
       - name: Check dashboard JavaScript
         run: node --check custom_components/ha_probulator/frontend/ha-probulator-cards.js
+      - name: Smoke-test dashboard bundle
+        run: node tests/frontend_smoke.mjs
       - uses: home-assistant/actions/hassfest@06749dd8c0b54f350bc69c8752456cee498808a3
 
   hacs:
