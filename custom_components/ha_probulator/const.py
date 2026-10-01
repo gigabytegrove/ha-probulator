@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "ha_probulator"
 NAME = "HA Probulator"
-VERSION = "1.0.0"
+VERSION = "1.1.0"
 
 CONF_TARGET_ID = "target_id"
 CONF_GROUP = "group"
@@ -40,6 +40,12 @@ MAX_RETRIES = 5
 MAX_THRESHOLD = 10
 MIN_STATISTICS_WINDOW = 10
 MAX_STATISTICS_WINDOW = 1000
+MAX_PROBE_CYCLE_SECONDS = 60.0
+
+MAX_NAME_LENGTH = 80
+MAX_GROUP_LENGTH = 80
+MAX_HOST_LENGTH = 253
+LATENCY_HISTORY_LIMIT = 60
 
 EVENT_STATUS_CHANGED = "ha_probulator_status_changed"
 
