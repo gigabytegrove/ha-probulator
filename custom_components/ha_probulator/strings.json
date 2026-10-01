@@ -3,17 +3,13 @@
   "config": {
     "step": {
       "user": {
-        "title": "Add a target",
-        "description": "Monitor a TCP service without relying on ICMP/ping.",
+        "title": "Choose a target type",
+        "description": "Pick the closest role. HA Probulator uses it only to suggest sensible ports, icons, groups, latency thresholds, and probe behavior; everything remains editable.",
         "data": {
-          "name": "Name",
-          "host": "Host or IP address",
-          "port": "TCP port"
+          "preset": "Target type"
         },
         "data_description": {
-          "name": "Friendly name used for the Home Assistant device.",
-          "host": "DNS name or IP address reachable from Home Assistant.",
-          "port": "TCP service port to probe."
+          "preset": "A starting profile for this target. It does not lock the target to a protocol or device class."
         }
       },
       "reconfigure": {
@@ -39,7 +35,13 @@
           "recovery_threshold": "Successes before recovery",
           "warning_latency_ms": "Warning latency",
           "critical_latency_ms": "Critical latency",
-          "statistics_window": "Statistics window"
+          "statistics_window": "Statistics window",
+          "dependency_target_id": "Depends on",
+          "adaptive_polling": "Adaptive polling",
+          "degraded_scan_interval": "Degraded probe interval",
+          "offline_scan_interval": "Offline probe interval",
+          "flap_window": "Flap detection window",
+          "flap_threshold": "Flap transition threshold"
         },
         "data_description": {
           "group": "Optional label used by HA Probulator overview and summary cards.",
@@ -52,7 +54,27 @@
           "recovery_threshold": "Consecutive successful probe cycles required before the target becomes online again.",
           "warning_latency_ms": "Response time at or above this value is considered degraded.",
           "critical_latency_ms": "Response time at or above this value is considered critical.",
-          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations."
+          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations.",
+          "dependency_target_id": "Optional upstream HA Probulator target. If it is unavailable, this target is shown as Dependency offline instead of producing a misleading independent outage.",
+          "adaptive_polling": "Temporarily probe more frequently while the target is degraded, unstable, or offline.",
+          "degraded_scan_interval": "Seconds between probes while the underlying target is degraded, unstable, or still establishing state.",
+          "offline_scan_interval": "Seconds between probes while the underlying target is offline.",
+          "flap_window": "Number of recent probe results used to detect rapid success/failure changes.",
+          "flap_threshold": "Number of success/failure transitions inside the flap window required to mark the target Unstable."
+        }
+      },
+      "target": {
+        "title": "Add target",
+        "description": "Enter the address and TCP service HA Probulator should monitor.",
+        "data": {
+          "name": "Name",
+          "host": "Host or IP address",
+          "port": "TCP port"
+        },
+        "data_description": {
+          "name": "Friendly name used for the Home Assistant device.",
+          "host": "DNS name or IP address reachable from Home Assistant.",
+          "port": "TCP service port to probe. The suggested value comes from the selected target type."
         }
       }
     },
@@ -64,7 +86,9 @@
       "host_too_long": "Host must be 253 characters or fewer.",
       "group_too_long": "Group must be 80 characters or fewer.",
       "critical_must_exceed_warning": "Critical latency must be greater than warning latency.",
-      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay."
+      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay.",
+      "flap_threshold_too_high": "The flap transition threshold must be lower than the flap detection window.",
+      "dependency_cycle": "That dependency would create a dependency loop."
     },
     "abort": {
       "already_configured": "That host and TCP port are already being monitored.",
@@ -88,7 +112,13 @@
           "recovery_threshold": "Successes before recovery",
           "warning_latency_ms": "Warning latency",
           "critical_latency_ms": "Critical latency",
-          "statistics_window": "Statistics window"
+          "statistics_window": "Statistics window",
+          "dependency_target_id": "Depends on",
+          "adaptive_polling": "Adaptive polling",
+          "degraded_scan_interval": "Degraded probe interval",
+          "offline_scan_interval": "Offline probe interval",
+          "flap_window": "Flap detection window",
+          "flap_threshold": "Flap transition threshold"
         },
         "data_description": {
           "group": "Optional label used by HA Probulator overview and summary cards.",
@@ -101,7 +131,13 @@
           "recovery_threshold": "Consecutive successful probe cycles required before the target becomes online again.",
           "warning_latency_ms": "Response time at or above this value is considered degraded.",
           "critical_latency_ms": "Response time at or above this value is considered critical.",
-          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations."
+          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations.",
+          "dependency_target_id": "Optional upstream HA Probulator target. If it is unavailable, this target is shown as Dependency offline instead of producing a misleading independent outage.",
+          "adaptive_polling": "Temporarily probe more frequently while the target is degraded, unstable, or offline.",
+          "degraded_scan_interval": "Seconds between probes while the underlying target is degraded, unstable, or still establishing state.",
+          "offline_scan_interval": "Seconds between probes while the underlying target is offline.",
+          "flap_window": "Number of recent probe results used to detect rapid success/failure changes.",
+          "flap_threshold": "Number of success/failure transitions inside the flap window required to mark the target Unstable."
         }
       }
     },
@@ -109,13 +145,18 @@
       "critical_must_exceed_warning": "Critical latency must be greater than warning latency.",
       "invalid_text": "Control characters are not allowed.",
       "group_too_long": "Group must be 80 characters or fewer.",
-      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay."
+      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay.",
+      "flap_threshold_too_high": "The flap transition threshold must be lower than the flap detection window.",
+      "dependency_cycle": "That dependency would create a dependency loop."
     }
   },
   "entity": {
     "binary_sensor": {
       "reachable": {
         "name": "Reachable"
+      },
+      "flapping": {
+        "name": "Flapping"
       }
     },
     "sensor": {
@@ -175,12 +216,32 @@
       },
       "jitter": {
         "name": "Jitter"
+      },
+      "flap_transitions": {
+        "name": "Flap transitions"
+      },
+      "current_scan_interval": {
+        "name": "Current probe interval"
       }
     },
     "button": {
       "probe_now": {
         "name": "Probe now"
       }
+    },
+    "switch": {
+      "monitoring": {
+        "name": "Monitoring"
+      },
+      "maintenance": {
+        "name": "Maintenance mode"
+      }
+    }
+  },
+  "issues": {
+    "missing_dependency": {
+      "title": "HA Probulator dependency is missing",
+      "description": "{target} depends on a HA Probulator target that is no longer loaded. Reconfigure {target} and choose a valid dependency or None."
     }
   }
 }
