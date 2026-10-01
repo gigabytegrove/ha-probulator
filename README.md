@@ -11,15 +11,15 @@ The name is intentionally a little ridiculous. The monitoring is not.
 - Monitors a host/IP plus TCP port from Home Assistant itself.
 - Does **not** depend on ICMP/ping, so devices that ignore ping can still be monitored.
 - Requires no external monitoring server, daemon, database, or Uptime Kuma installation.
-- Configures targets entirely through the Home Assistant UI.
-- Supports retries, connection timeouts, failure/recovery debounce thresholds, and configurable polling intervals.
+- Configures targets entirely through the Home Assistant UI, including role-based setup presets.
+- Supports retries, connection timeouts, failure/recovery debounce thresholds, adaptive polling, dependency relationships, and configurable polling intervals.
 - Tracks current, average, minimum, maximum, 95th-percentile response time, and TCP latency jitter.
 - Tracks rolling probe success rate, probe counters, status-change times, and outage duration.
 - Exposes target state as normal Home Assistant entities and attributes.
 - Includes an immediate **Probe now** button for every target.
 - Includes optional HA Probulator dashboard cards with Home Assistant theme support.
-- Groups targets for filtered overview/summary cards.
-- Fires `ha_probulator_status_changed` whenever a target changes between online, degraded, and offline states.
+- Groups targets for filtered overview/summary/manager cards and group-targeted actions.
+- Fires `ha_probulator_status_changed` for effective target state changes, including degraded, unstable, offline, dependency-offline, disabled, and maintenance-aware transitions.
 - Provides Home Assistant diagnostics for each target.
 
 ## Installation
@@ -52,7 +52,9 @@ Restart Home Assistant, then add HA Probulator from **Settings → Devices & ser
 
 ## Adding a target
 
-Each HA Probulator config entry represents one monitored TCP endpoint. Enter:
+Each HA Probulator config entry represents one monitored TCP endpoint. Setup first asks for a target role preset such as **Router / gateway**, **Network switch**, **Server**, **NAS**, **HTTPS**, **DNS**, **Home Assistant**, **Proxmox VE**, **SSH**, or **SMTP**. The preset only supplies suggestions; every value remains editable.
+
+Then enter:
 
 - **Name** — friendly device name in Home Assistant.
 - **Host or IP address** — for example `192.168.1.1`, `nas.local`, or `1.1.1.1`.
@@ -60,13 +62,16 @@ Each HA Probulator config entry represents one monitored TCP endpoint. Enter:
 
 The target does not need to be online while you add it. HA Probulator is specifically intended to monitor failures, so setup does not reject an endpoint merely because it is currently unavailable.
 
-Setup now includes a second **Monitoring options** step so the polling interval, retry/debounce behavior, thresholds, group, and icon can be customized before the target is created. After setup, use **Configure** to adjust those monitoring options and **Reconfigure** to change the target name, host, or port.
+Setup then includes a **Monitoring options** step so the polling interval, retry/debounce behavior, dependency, adaptive polling, flap detection, thresholds, group, and icon can be customized before the target is created. After setup, use **Configure** to adjust those monitoring options and **Reconfigure** to change the target name, host, or port.
 
 ## Monitoring options
 
 | Option | Default | Purpose |
 | --- | ---: | --- |
-| Probe interval | 30 s | Time between probe cycles |
+| Probe interval | 30 s | Normal healthy-target probe interval |
+| Adaptive polling | enabled | Probe unhealthy targets more aggressively |
+| Degraded interval | 10 s | Interval while degraded, unstable, or probing |
+| Offline interval | 15 s | Interval while offline |
 | Connection timeout | 3.0 s | Maximum time allowed for each TCP attempt |
 | Retries | 1 | Additional attempts during the same probe cycle |
 | Retry delay | 0.25 s | Delay between retry attempts |
@@ -75,7 +80,10 @@ Setup now includes a second **Monitoring options** step so the polling interval,
 | Warning latency | 150 ms | Response time considered degraded |
 | Critical latency | 500 ms | Response time considered critical/degraded |
 | Statistics window | 120 probes | Rolling sample count used for latency and success-rate statistics |
-| Group | blank | Optional label used by overview/summary cards |
+| Flap window | 10 probes | Recent results used for instability detection |
+| Flap threshold | 4 transitions | Changes required to mark a target unstable |
+| Depends on | none | Optional upstream Probulator target |
+| Group | blank | Optional label used by overview/summary/manager cards |
 
 HA Probulator rejects timeout/retry combinations whose theoretical worst-case probe cycle exceeds 60 seconds. This prevents a single misconfigured target from tying up its coordinator for minutes at a time.
 
@@ -85,6 +93,7 @@ Every target is represented as a Home Assistant device. Entity IDs are generated
 
 ```text
 binary_sensor.core_router_reachable
+binary_sensor.core_router_flapping
 sensor.core_router_response_time
 sensor.core_router_average_response_time
 sensor.core_router_95th_percentile_response_time
@@ -98,6 +107,8 @@ sensor.core_router_current_outage_duration
 sensor.core_router_status
 sensor.core_router_quality
 button.core_router_probe_now
+switch.core_router_monitoring
+switch.core_router_maintenance_mode
 ```
 
 Additional diagnostic entities such as total probes, last success, and last failure are created disabled by default and can be enabled from the device page.
@@ -111,7 +122,16 @@ host
 port
 group
 status
+underlying_status
+monitoring_enabled
+maintenance
+maintenance_until
+dependency_target_id
+dependency_name
+dependency_status
 quality
+flapping
+flap_transitions
 response_time_ms
 average_response_time_ms
 p95_response_time_ms
@@ -134,6 +154,13 @@ last_outage_duration_seconds
 last_error
 attempts
 scan_interval
+current_scan_interval
+adaptive_polling
+degraded_scan_interval
+offline_scan_interval
+probe_cycle_ms
+probe_queue_wait_ms
+initial_stagger_seconds
 timeout
 retries
 failure_threshold
@@ -263,6 +290,20 @@ title: Servers
 group: Servers
 ```
 
+
+### Manager card
+
+The Manager card is the operational surface for larger installations:
+
+```yaml
+type: custom:probulator-manager-card
+title: HA Probulator Manager
+sort: status
+show_actions: true
+```
+
+It supports live search, group filtering, status-first sorting, and per-target **Probe**, **Maintenance**, and **Enable/Disable** actions directly from the dashboard. Those buttons call HA Probulator's native administrator-only Home Assistant actions; the card is not maintaining a separate state model.
+
 ## Themes
 
 HA Probulator cards inherit the active Home Assistant theme. They also expose CSS variables that can be placed in any Home Assistant theme:
@@ -293,6 +334,42 @@ The matching CSS custom properties are:
 ```
 
 Card-level color/background overrides take precedence over theme defaults where supplied.
+
+
+## Operational intelligence
+
+### Maintenance mode
+
+Every target has a native **Maintenance mode** switch. Maintenance mode continues collecting probes and statistics but suppresses normal operational status transitions. It can also be started for a fixed duration through the `ha_probulator.start_maintenance` action.
+
+### Monitoring enable/disable
+
+Every target has a native **Monitoring** switch. Turning monitoring off stops active TCP probes without deleting the target or losing its configuration. The effective status becomes `disabled`.
+
+### Dependencies
+
+A target can depend on another HA Probulator target. If the upstream target is unavailable, the dependent target becomes `dependency_offline` rather than looking like an unrelated outage. Configuration prevents dependency loops, and Home Assistant Repairs warns if a configured dependency later disappears.
+
+### Flapping / instability
+
+HA Probulator can detect repeated success/failure changes inside a configurable rolling window. A reachable target that crosses the flap threshold becomes `unstable`, and `binary_sensor.*_flapping` is available for automations.
+
+### Adaptive polling and scale
+
+Healthy targets use their normal interval. Degraded, unstable, probing, and offline targets can temporarily use shorter intervals. Initial probes are deterministically staggered, and a shared concurrency semaphore prevents large installations from launching an unbounded number of TCP connection attempts at once.
+
+Hidden diagnostic sensors can expose probe-cycle duration and queue wait, making it possible to see when the Home Assistant host itself is becoming a monitoring bottleneck.
+
+## Home Assistant actions
+
+HA Probulator registers administrator-only actions:
+
+- `ha_probulator.probe`
+- `ha_probulator.set_monitoring`
+- `ha_probulator.start_maintenance`
+- `ha_probulator.end_maintenance`
+
+Each action can target a stable Probulator target ID, a group, or—when both are omitted—all loaded targets.
 
 ## Automations and templates
 
@@ -347,7 +424,7 @@ Latency at or above the warning/critical thresholds also produces a `degraded` s
 
 ## Probe model
 
-HA Probulator 1.1 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
+HA Probulator 1.2 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
 
 This is deliberate. TCP monitoring is small, local, predictable, and works with devices that do not answer ICMP echo requests.
 
@@ -365,6 +442,8 @@ Validation includes:
 - Unit tests for retry/cancellation/error classification, input hardening, IPv4/IPv6/IDNA handling, debounce/outage behavior, and rolling statistics.
 - JSON validation.
 - JavaScript syntax validation.
+- Executable frontend registration and hostile-text rendering smoke tests.
+- Backend/frontend/manifest version synchronization checks.
 - Home Assistant Hassfest.
 - HACS integration validation.
 
