@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import zlib
 from datetime import timedelta
 from typing import Any
 
@@ -124,6 +126,10 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         )
         self._has_update = False
         self._last_effective_status = "probing"
+        self._initial_stagger_done = False
+        self.initial_stagger_seconds = (
+            zlib.crc32(self.target_id.encode("utf-8")) % 2000
+        ) / 1000.0
 
         self.metrics = ProbeMetrics(
             window_size=int(
@@ -234,6 +240,7 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 "recovery_threshold": self.metrics.recovery_threshold,
                 "warning_latency_ms": self.metrics.warning_latency_ms,
                 "critical_latency_ms": self.metrics.critical_latency_ms,
+                "initial_stagger_seconds": self.initial_stagger_seconds,
             }
         )
         return snapshot
@@ -242,8 +249,21 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         monitoring_enabled = self.manager.monitoring_enabled(self.target_id)
         maintenance = self.manager.in_maintenance(self.target_id)
 
+        probe_cycle_ms = None
+        probe_queue_wait_ms = None
         if monitoring_enabled:
+            if not self._initial_stagger_done and self.initial_stagger_seconds:
+                await asyncio.sleep(self.initial_stagger_seconds)
+            self._initial_stagger_done = True
+
+            loop = asyncio.get_running_loop()
+            cycle_started = loop.time()
+            queue_started = loop.time()
             async with self.manager.probe_semaphore:
+                probe_queue_wait_ms = round(
+                    (loop.time() - queue_started) * 1000.0,
+                    3,
+                )
                 sample = await async_tcp_probe(
                     self.host,
                     self.port,
@@ -251,6 +271,7 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     retries=self.retries,
                     retry_delay=self.retry_delay,
                 )
+            probe_cycle_ms = round((loop.time() - cycle_started) * 1000.0, 3)
             snapshot = self.metrics.record(sample)
             self.manager.persist_metrics(self.target_id, snapshot)
         else:
@@ -285,6 +306,8 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             maintenance=maintenance,
             dependency_status=dependency_status,
         )
+        snapshot["probe_cycle_ms"] = probe_cycle_ms
+        snapshot["probe_queue_wait_ms"] = probe_queue_wait_ms
 
         current_status = str(snapshot["status"])
         previous_status = self._last_effective_status
@@ -320,6 +343,8 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                     "response_time_ms": snapshot["response_time_ms"],
                     "p95_response_time_ms": snapshot["p95_response_time_ms"],
                     "jitter_ms": snapshot["jitter_ms"],
+                    "probe_cycle_ms": snapshot["probe_cycle_ms"],
+                    "probe_queue_wait_ms": snapshot["probe_queue_wait_ms"],
                     "success_rate": snapshot["success_rate"],
                     "consecutive_failures": snapshot["consecutive_failures"],
                     "last_error": snapshot["last_error"],
