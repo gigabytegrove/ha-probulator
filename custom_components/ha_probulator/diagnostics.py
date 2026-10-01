@@ -10,8 +10,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_HOST
 from homeassistant.core import HomeAssistant
 
-from .const import DOMAIN
+from .const import DATA_MANAGER, DOMAIN
 from .coordinator import ProbulatorCoordinator
+from .runtime import ProbulatorRuntimeManager
 
 TO_REDACT = {CONF_HOST, "target"}
 
@@ -22,6 +23,8 @@ async def async_get_config_entry_diagnostics(
     """Return privacy-aware diagnostics for a monitored target."""
     coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
     data = dict(coordinator.data)
+    manager: ProbulatorRuntimeManager = hass.data[DOMAIN][DATA_MANAGER]
+    runtime = dict(manager._state(coordinator.target_id))
 
     for key, value in list(data.items()):
         if isinstance(value, datetime):
@@ -34,4 +37,5 @@ async def async_get_config_entry_diagnostics(
             "options": dict(entry.options),
         },
         "state": async_redact_data(data, TO_REDACT),
+        "runtime": async_redact_data(runtime, TO_REDACT),
     }
