@@ -62,10 +62,7 @@ async def _async_set_monitoring(hass: HomeAssistant, call: ServiceCall) -> None:
     manager, targets = _targets_for_call(hass, call)
     enabled = bool(call.data[ATTR_ENABLED])
     await asyncio.gather(
-        *(
-            manager.async_set_monitoring(target.target_id, enabled)
-            for target in targets
-        )
+        *(manager.async_set_monitoring(target.target_id, enabled) for target in targets)
     )
 
 
@@ -89,10 +86,7 @@ async def _async_end_maintenance(hass: HomeAssistant, call: ServiceCall) -> None
     """End maintenance for matching targets."""
     manager, targets = _targets_for_call(hass, call)
     await asyncio.gather(
-        *(
-            manager.async_set_maintenance(target.target_id, False)
-            for target in targets
-        )
+        *(manager.async_set_maintenance(target.target_id, False) for target in targets)
     )
 
 
