@@ -49,6 +49,7 @@ class ProbeMetrics:
         self.last_status_change: datetime | None = None
         self.outage_started: datetime | None = None
         self.last_outage_duration_seconds: float | None = None
+        self._failure_streak_started: datetime | None = None
         self.last_error: str | None = None
         self.latest: ProbeSample | None = None
 
@@ -99,6 +100,7 @@ class ProbeMetrics:
             self.successful_probes += 1
             self.consecutive_successes += 1
             self.consecutive_failures = 0
+            self._failure_streak_started = None
             self.last_success = sample.timestamp
             self.last_error = None
             if self.reachable is not True and (
@@ -107,6 +109,8 @@ class ProbeMetrics:
                 self.reachable = True
         else:
             self.failed_probes += 1
+            if self.consecutive_failures == 0:
+                self._failure_streak_started = sample.timestamp
             self.consecutive_failures += 1
             self.consecutive_successes = 0
             self.last_failure = sample.timestamp
@@ -117,7 +121,7 @@ class ProbeMetrics:
                 self.reachable = False
 
         if previous_reachable is not False and self.reachable is False:
-            self.outage_started = sample.timestamp
+            self.outage_started = self._failure_streak_started or sample.timestamp
         elif previous_reachable is False and self.reachable is True:
             if self.outage_started is not None:
                 self.last_outage_duration_seconds = round(
