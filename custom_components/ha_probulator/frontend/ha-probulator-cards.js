@@ -139,6 +139,151 @@ function applyInlineTheme(element, config) {
   }
 }
 
+function fireConfigChanged(element, config) {
+  element.dispatchEvent(new CustomEvent("config-changed", {
+    bubbles: true,
+    composed: true,
+    detail: { config },
+  }));
+}
+
+class ProbulatorFormEditor extends HTMLElement {
+  constructor() {
+    super();
+    this.attachShadow({ mode: "open" });
+    this._config = {};
+    this._schema = [];
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._render();
+  }
+
+  setConfig(config) {
+    this._config = { ...config };
+    this._render();
+  }
+
+  configure(schema, labels) {
+    this._schema = schema;
+    this._labels = labels;
+    this._render();
+  }
+
+  _render() {
+    if (!this.shadowRoot || !this._hass || !this._schema.length) return;
+    this.shadowRoot.innerHTML = `
+      <style>
+        :host { display:block; padding:8px 0; }
+        .hint { color:var(--secondary-text-color); font-size:.82rem; margin:0 0 12px; }
+      </style>
+      <div class="hint">All fields are optional unless marked required. Changes preview immediately.</div>
+      <ha-form></ha-form>
+    `;
+    const form = this.shadowRoot.querySelector("ha-form");
+    form.hass = this._hass;
+    form.data = this._config;
+    form.schema = this._schema;
+    form.computeLabel = (schema) => this._labels?.[schema.name] || schema.name || "";
+    form.addEventListener("value-changed", (event) => {
+      this._config = { ...event.detail.value };
+      fireConfigChanged(this, this._config);
+    });
+  }
+}
+
+class ProbulatorTargetEditor extends ProbulatorFormEditor {
+  constructor() {
+    super();
+    this.configure([
+      { name: "entity", required: true, selector: { entity: { domain: ["binary_sensor"] } } },
+      { name: "mode", selector: { select: { options: ["minimal", "normal", "extended"], mode: "dropdown" } } },
+      { name: "name", selector: { text: {} } },
+      { name: "icon", selector: { icon: {} } },
+      { name: "show_response", selector: { boolean: {} } },
+      { name: "show_average", selector: { boolean: {} } },
+      { name: "show_success", selector: { boolean: {} } },
+      { name: "show_p95", selector: { boolean: {} } },
+      { name: "show_sparkline", selector: { boolean: {} } },
+      { name: "online_color", selector: { text: {} } },
+      { name: "degraded_color", selector: { text: {} } },
+      { name: "offline_color", selector: { text: {} } },
+      { name: "background", selector: { text: {} } },
+      { name: "border_radius", selector: { text: {} } },
+      { name: "metric_font_size", selector: { text: {} } },
+    ], {
+      entity: "Target entity",
+      mode: "Display mode",
+      name: "Display name",
+      icon: "Icon",
+      show_response: "Show response time",
+      show_average: "Show average response time",
+      show_success: "Show success rate",
+      show_p95: "Show 95th percentile",
+      show_sparkline: "Show latency sparkline (Extended)",
+      online_color: "Online color (CSS value)",
+      degraded_color: "Degraded color (CSS value)",
+      offline_color: "Offline color (CSS value)",
+      background: "Card background (CSS value)",
+      border_radius: "Border radius (CSS value)",
+      metric_font_size: "Metric font size (CSS value)",
+    });
+  }
+}
+
+class ProbulatorOverviewEditor extends ProbulatorFormEditor {
+  constructor() {
+    super();
+    this.configure([
+      { name: "title", selector: { text: {} } },
+      { name: "group", selector: { text: {} } },
+      { name: "sort", selector: { select: { options: ["status", "name"], mode: "dropdown" } } },
+      { name: "entities", selector: { entity: { domain: ["binary_sensor"], multiple: true } } },
+      { name: "online_color", selector: { text: {} } },
+      { name: "degraded_color", selector: { text: {} } },
+      { name: "offline_color", selector: { text: {} } },
+      { name: "background", selector: { text: {} } },
+      { name: "border_radius", selector: { text: {} } },
+    ], {
+      title: "Title",
+      group: "Group filter",
+      sort: "Sort order",
+      entities: "Specific targets",
+      online_color: "Online color (CSS value)",
+      degraded_color: "Degraded color (CSS value)",
+      offline_color: "Offline color (CSS value)",
+      background: "Card background (CSS value)",
+      border_radius: "Border radius (CSS value)",
+    });
+  }
+}
+
+class ProbulatorSummaryEditor extends ProbulatorFormEditor {
+  constructor() {
+    super();
+    this.configure([
+      { name: "title", selector: { text: {} } },
+      { name: "group", selector: { text: {} } },
+      { name: "entities", selector: { entity: { domain: ["binary_sensor"], multiple: true } } },
+      { name: "online_color", selector: { text: {} } },
+      { name: "degraded_color", selector: { text: {} } },
+      { name: "offline_color", selector: { text: {} } },
+      { name: "background", selector: { text: {} } },
+      { name: "border_radius", selector: { text: {} } },
+    ], {
+      title: "Title",
+      group: "Group filter",
+      entities: "Specific targets",
+      online_color: "Online color (CSS value)",
+      degraded_color: "Degraded color (CSS value)",
+      offline_color: "Offline color (CSS value)",
+      background: "Card background (CSS value)",
+      border_radius: "Border radius (CSS value)",
+    });
+  }
+}
+
 function sparkline(history) {
   const points = Array.isArray(history)
     ? history.map((item) => Number(item?.latency_ms)).filter(Number.isFinite)
@@ -164,12 +309,31 @@ class ProbulatorCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { mode: "normal" };
+    return {
+      mode: "normal",
+      show_response: true,
+      show_average: true,
+      show_success: true,
+      show_p95: false,
+      show_sparkline: true,
+    };
+  }
+
+  static async getConfigElement() {
+    return document.createElement("probulator-target-editor");
   }
 
   setConfig(config) {
     if (!config || !config.entity) throw new Error("HA Probulator card requires an entity");
-    this._config = { mode: "normal", ...config };
+    this._config = {
+      mode: "normal",
+      show_response: true,
+      show_average: true,
+      show_success: true,
+      show_p95: false,
+      show_sparkline: true,
+      ...config,
+    };
     if (!["minimal", "normal", "extended"].includes(this._config.mode)) {
       throw new Error("mode must be minimal, normal, or extended");
     }
@@ -232,7 +396,7 @@ class ProbulatorCard extends HTMLElement {
           <div class="label">Last failure</div><div class="value">${esc(fmtTime(a.last_failure))}</div>
           ${a.last_error ? `<div class="label">Last error</div><div class="value">${esc(a.last_error)}</div>` : ""}
         </div>
-        ${sparkline(a.latency_history)}
+        ${this._config.show_sparkline !== false ? sparkline(a.latency_history) : ""}
       ` : "";
       this.shadowRoot.innerHTML = `
         <style>${PROBULATOR_STYLE}</style>
@@ -247,9 +411,10 @@ class ProbulatorCard extends HTMLElement {
               <div class="status"><span class="dot"></span>${esc(status)}</div>
             </div>
             <div class="metric-grid">
-              <div class="metric"><div class="value">${fmtMs(a.response_time_ms)}</div><div class="label">Response</div></div>
-              <div class="metric"><div class="value">${fmtMs(a.average_response_time_ms)}</div><div class="label">Average</div></div>
-              <div class="metric"><div class="value">${fmtPct(a.success_rate)}</div><div class="label">Success</div></div>
+              ${this._config.show_response !== false ? `<div class="metric"><div class="value">${fmtMs(a.response_time_ms)}</div><div class="label">Response</div></div>` : ""}
+              ${this._config.show_average !== false ? `<div class="metric"><div class="value">${fmtMs(a.average_response_time_ms)}</div><div class="label">Average</div></div>` : ""}
+              ${this._config.show_success !== false ? `<div class="metric"><div class="value">${fmtPct(a.success_rate)}</div><div class="label">Success</div></div>` : ""}
+              ${this._config.show_p95 === true ? `<div class="metric"><div class="value">${fmtMs(a.p95_response_time_ms)}</div><div class="label">95th percentile</div></div>` : ""}
             </div>
             ${extended}
           </div>
@@ -275,6 +440,10 @@ class ProbulatorOverviewCard extends HTMLElement {
 
   static getStubConfig() {
     return { title: "HA Probulator", sort: "status" };
+  }
+
+  static async getConfigElement() {
+    return document.createElement("probulator-overview-editor");
   }
 
   setConfig(config) {
@@ -339,6 +508,10 @@ class ProbulatorSummaryCard extends HTMLElement {
     return { title: "Network status" };
   }
 
+  static async getConfigElement() {
+    return document.createElement("probulator-summary-editor");
+  }
+
   setConfig(config) {
     this._config = { title: "Network status", ...config };
     applyInlineTheme(this, this._config);
@@ -381,6 +554,10 @@ class ProbulatorSummaryCard extends HTMLElement {
       </ha-card>`;
   }
 }
+
+if (!customElements.get("probulator-target-editor")) customElements.define("probulator-target-editor", ProbulatorTargetEditor);
+if (!customElements.get("probulator-overview-editor")) customElements.define("probulator-overview-editor", ProbulatorOverviewEditor);
+if (!customElements.get("probulator-summary-editor")) customElements.define("probulator-summary-editor", ProbulatorSummaryEditor);
 
 if (!customElements.get("probulator-card")) customElements.define("probulator-card", ProbulatorCard);
 if (!customElements.get("probulator-overview-card")) customElements.define("probulator-overview-card", ProbulatorOverviewCard);
