@@ -1,5 +1,24 @@
 # Changelog
 
+## 1.2.0 - 2026-10-01
+
+Operational intelligence and large-installation polish.
+
+- Added role-based setup presets for routers, switches, servers, NAS, HTTPS, DNS, Home Assistant, Proxmox VE, SSH, SMTP, and generic TCP targets.
+- Added persistent native Monitoring and Maintenance switches without deleting/recreating config entries.
+- Added timed maintenance and administrator-only Probe, Set monitoring, Start maintenance, and End maintenance Home Assistant actions with target/group/all scoping.
+- Added target dependency relationships, dependency-loop prevention, dependency-offline status, dependent refresh propagation, and a Home Assistant Repairs warning for missing dependencies.
+- Added rolling flap detection, the Unstable status, a native Flapping binary sensor, and transition/window diagnostics.
+- Added adaptive polling with separate healthy/degraded/offline intervals.
+- Added deterministic startup staggering and a shared 20-probe concurrency limiter for large installations.
+- Added hidden probe-cycle and queue-wait diagnostic sensors for runtime self-health.
+- Persisted lifetime probe counters, last success/failure, last outage duration, maintenance state, and monitoring enabled state across Home Assistant restarts.
+- Added a status-aware HA Probulator Manager dashboard card with live search, group filtering, and per-target operational controls.
+- Expanded cards for maintenance, disabled, dependency-offline, and unstable states.
+- Added frontend/backend version handshake and a cache-busted resource URL keyed to the integration version.
+- Added reduced-motion support and hostile target-text rendering tests.
+- Added explicit config-entry migration to the 1.2 schema while preserving existing target IDs/entity identities.
+
 ## 1.1.0 - 2026-10-01
 
 Hardening, observability, and distribution pass.
