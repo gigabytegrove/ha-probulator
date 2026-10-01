@@ -58,6 +58,10 @@ class ProbeMetrics:
         self.last_status_change: datetime | None = None
         self.outage_started: datetime | None = None
         self.last_outage_duration_seconds: float | None = None
+        self.outage_count = 0
+        self.total_outage_duration_seconds = 0.0
+        self.longest_outage_duration_seconds: float | None = None
+        self.stable_since: datetime | None = None
         self._failure_streak_started: datetime | None = None
         self.last_error: str | None = None
         self.latest: ProbeSample | None = None
@@ -99,8 +103,15 @@ class ProbeMetrics:
         self.successful_probes = int(data.get("successful_probes") or 0)
         self.failed_probes = int(data.get("failed_probes") or 0)
         self.last_outage_duration_seconds = data.get("last_outage_duration_seconds")
+        self.outage_count = int(data.get("outage_count") or 0)
+        self.total_outage_duration_seconds = float(
+            data.get("total_outage_duration_seconds") or 0.0
+        )
+        self.longest_outage_duration_seconds = data.get(
+            "longest_outage_duration_seconds"
+        )
 
-        for key in ("last_success", "last_failure"):
+        for key in ("last_success", "last_failure", "stable_since"):
             raw = data.get(key)
             if not raw:
                 continue
@@ -151,6 +162,8 @@ class ProbeMetrics:
                 self.consecutive_successes >= self.recovery_threshold
             ):
                 self.reachable = True
+                if self.stable_since is None:
+                    self.stable_since = sample.timestamp
         else:
             self.failed_probes += 1
             if self.consecutive_failures == 0:
@@ -163,15 +176,28 @@ class ProbeMetrics:
                 self.consecutive_failures >= self.failure_threshold
             ):
                 self.reachable = False
+                self.stable_since = None
 
         if previous_reachable is not False and self.reachable is False:
             self.outage_started = self._failure_streak_started or sample.timestamp
         elif previous_reachable is False and self.reachable is True:
             if self.outage_started is not None:
-                self.last_outage_duration_seconds = round(
+                duration = round(
                     max(0.0, (sample.timestamp - self.outage_started).total_seconds()),
                     3,
                 )
+                self.last_outage_duration_seconds = duration
+                self.outage_count += 1
+                self.total_outage_duration_seconds = round(
+                    self.total_outage_duration_seconds + duration,
+                    3,
+                )
+                if (
+                    self.longest_outage_duration_seconds is None
+                    or duration > self.longest_outage_duration_seconds
+                ):
+                    self.longest_outage_duration_seconds = duration
+                self.stable_since = sample.timestamp
             self.outage_started = None
 
         current_status = self.status
@@ -222,6 +248,12 @@ class ProbeMetrics:
                 3,
             )
 
+        mean_outage = (
+            round(self.total_outage_duration_seconds / self.outage_count, 3)
+            if self.outage_count
+            else None
+        )
+
         history = [
             {
                 "timestamp": sample.timestamp.isoformat(),
@@ -259,6 +291,11 @@ class ProbeMetrics:
             "outage_started": self.outage_started,
             "current_outage_duration_seconds": current_outage,
             "last_outage_duration_seconds": self.last_outage_duration_seconds,
+            "outage_count": self.outage_count,
+            "total_outage_duration_seconds": self.total_outage_duration_seconds,
+            "longest_outage_duration_seconds": self.longest_outage_duration_seconds,
+            "mean_outage_duration_seconds": mean_outage,
+            "stable_since": self.stable_since,
             "last_error": self.last_error,
             "attempts": self.latest.attempts if self.latest else 0,
             "latency_history": history,
