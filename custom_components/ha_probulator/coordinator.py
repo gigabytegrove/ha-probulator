@@ -358,4 +358,5 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         if status_changed:
             self.manager.notify_dependents(self.target_id)
 
+        self.manager.refresh_group_entities()
         return snapshot
