@@ -6,7 +6,6 @@ from typing import Any
 from uuid import uuid4
 
 import voluptuous as vol
-
 from homeassistant import config_entries
 from homeassistant.config_entries import ConfigFlowResult, OptionsFlow
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT, UnitOfTime
@@ -101,7 +100,9 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
     merged = {**_default_options(), **defaults}
     return vol.Schema(
         {
-            vol.Optional(CONF_GROUP, default=merged[CONF_GROUP]): selector.TextSelector(),
+            vol.Optional(
+                CONF_GROUP, default=merged[CONF_GROUP]
+            ): selector.TextSelector(),
             vol.Required(CONF_ICON, default=merged[CONF_ICON]): selector.IconSelector(),
             vol.Required(
                 CONF_SCAN_INTERVAL, default=merged[CONF_SCAN_INTERVAL]
@@ -114,7 +115,9 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required(CONF_TIMEOUT, default=merged[CONF_TIMEOUT]): selector.NumberSelector(
+            vol.Required(
+                CONF_TIMEOUT, default=merged[CONF_TIMEOUT]
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=MIN_TIMEOUT,
                     max=MAX_TIMEOUT,
@@ -123,7 +126,9 @@ def _options_schema(defaults: dict[str, Any]) -> vol.Schema:
                     mode=selector.NumberSelectorMode.BOX,
                 )
             ),
-            vol.Required(CONF_RETRIES, default=merged[CONF_RETRIES]): selector.NumberSelector(
+            vol.Required(
+                CONF_RETRIES, default=merged[CONF_RETRIES]
+            ): selector.NumberSelector(
                 selector.NumberSelectorConfig(
                     min=0,
                     max=MAX_RETRIES,
@@ -293,7 +298,9 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 
         return self.async_show_form(
             step_id="user",
-            data_schema=self.add_suggested_values_to_schema(_target_schema(), suggested),
+            data_schema=self.add_suggested_values_to_schema(
+                _target_schema(), suggested
+            ),
             errors=errors,
         )
 
@@ -387,7 +394,10 @@ class ProbulatorOptionsFlow(OptionsFlow):
     ) -> ConfigFlowResult:
         """Manage target options."""
         errors: dict[str, str] = {}
-        suggested = user_input or {**_default_options(), **dict(self.config_entry.options)}
+        suggested = user_input or {
+            **_default_options(),
+            **dict(self.config_entry.options),
+        }
 
         if user_input is not None:
             values, errors = _normalize_options(user_input)
