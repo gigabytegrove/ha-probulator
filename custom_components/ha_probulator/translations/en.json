@@ -228,6 +228,18 @@
       },
       "probe_queue_wait": {
         "name": "Probe queue wait"
+      },
+      "outage_count": {
+        "name": "Outage count"
+      },
+      "longest_outage_duration": {
+        "name": "Longest outage"
+      },
+      "mean_outage_duration": {
+        "name": "Mean outage duration"
+      },
+      "stable_since": {
+        "name": "Stable since"
       }
     },
     "button": {
