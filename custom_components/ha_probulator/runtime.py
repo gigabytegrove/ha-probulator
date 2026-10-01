@@ -199,9 +199,10 @@ class ProbulatorRuntimeManager:
                 key = group.casefold()
                 if key in entities:
                     continue
-                entity = factory(group)
-                entities[key] = entity
-                new_entities.append(entity)
+                created = factory(group)
+                group_entities = created if isinstance(created, list) else [created]
+                entities[key] = group_entities
+                new_entities.extend(group_entities)
             if new_entities:
                 async_add_entities(new_entities)
 
@@ -210,8 +211,10 @@ class ProbulatorRuntimeManager:
         self._ensure_group_entities()
         live_groups = {group.casefold() for group in self.groups()}
         for entities in self._group_entities.values():
-            for key, entity in entities.items():
-                if key in live_groups:
+            for key, group_entities in entities.items():
+                if key not in live_groups:
+                    continue
+                for entity in group_entities:
                     entity.async_write_ha_state()
 
     def _state(self, target_id: str) -> dict[str, Any]:
