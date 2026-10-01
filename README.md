@@ -13,7 +13,7 @@ The name is intentionally a little ridiculous. The monitoring is not.
 - Requires no external monitoring server, daemon, database, or Uptime Kuma installation.
 - Configures targets entirely through the Home Assistant UI.
 - Supports retries, connection timeouts, failure/recovery debounce thresholds, and configurable polling intervals.
-- Tracks current, average, minimum, maximum, and 95th-percentile response time.
+- Tracks current, average, minimum, maximum, 95th-percentile response time, and TCP latency jitter.
 - Tracks rolling probe success rate, probe counters, status-change times, and outage duration.
 - Exposes target state as normal Home Assistant entities and attributes.
 - Includes an immediate **Probe now** button for every target.
@@ -88,6 +88,7 @@ binary_sensor.core_router_reachable
 sensor.core_router_response_time
 sensor.core_router_average_response_time
 sensor.core_router_95th_percentile_response_time
+sensor.core_router_jitter
 sensor.core_router_minimum_response_time
 sensor.core_router_maximum_response_time
 sensor.core_router_success_rate
@@ -114,6 +115,7 @@ quality
 response_time_ms
 average_response_time_ms
 p95_response_time_ms
+jitter_ms
 min_response_time_ms
 max_response_time_ms
 success_rate
@@ -193,7 +195,7 @@ Supported modes:
 
 - `minimal` — name/status and current response time.
 - `normal` — status plus current/average response time and success rate.
-- `extended` — the full target view, including host/port, group, min/p95/max response time, failure information, last check/status change, outage duration, timestamps, sanitized last-error category, and a recent latency sparkline.
+- `extended` — the full target view, including host/port, group, min/p95/max response time, jitter, failure information, last check/status change, outage duration, timestamps, sanitized last-error category, and a recent latency sparkline.
 
 The visual editor can select the target, mode, icon/name overrides, individual metric visibility, sparkline visibility, and common theme overrides.
 
@@ -209,6 +211,7 @@ show_response: true
 show_average: true
 show_success: true
 show_p95: true
+show_jitter: true
 show_sparkline: true
 online_color: "#00c853"
 degraded_color: "#ffab00"
