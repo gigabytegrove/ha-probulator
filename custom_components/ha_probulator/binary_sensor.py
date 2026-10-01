@@ -10,11 +10,13 @@ from homeassistant.components.binary_sensor import (
 )
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
+from homeassistant.helpers.device_registry import DeviceInfo
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN, VERSION
+from .const import DATA_MANAGER, DOMAIN, VERSION
 from .coordinator import ProbulatorCoordinator
 from .entity import ProbulatorEntity
+from .runtime import ProbulatorRuntimeManager
 
 
 async def async_setup_entry(
@@ -24,11 +26,21 @@ async def async_setup_entry(
 ) -> None:
     """Set up reachability for one target."""
     coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
+    manager: ProbulatorRuntimeManager = hass.data[DOMAIN][DATA_MANAGER]
     async_add_entities(
         [
             ProbulatorReachableSensor(coordinator, entry),
             ProbulatorFlappingSensor(coordinator, entry),
         ]
+    )
+    manager.register_group_platform(
+        "binary_sensor",
+        entry.entry_id,
+        async_add_entities,
+        lambda group: ProbulatorGroupHealthSensor(manager, group),
+    )
+    entry.async_on_unload(
+        lambda: manager.unregister_group_platform("binary_sensor", entry.entry_id)
     )
 
 
@@ -161,4 +173,46 @@ class ProbulatorFlappingSensor(ProbulatorEntity, BinarySensorEntity):
             "transitions": data.get("flap_transitions"),
             "window": data.get("flap_window"),
             "threshold": data.get("flap_threshold"),
+        }
+
+
+class ProbulatorGroupHealthSensor(BinarySensorEntity):
+    """Aggregate health for one HA Probulator group."""
+
+    _attr_has_entity_name = True
+    _attr_device_class = BinarySensorDeviceClass.CONNECTIVITY
+    _attr_name = "Healthy"
+
+    def __init__(self, manager: ProbulatorRuntimeManager, group: str) -> None:
+        self._manager = manager
+        self._group = group
+        key = group.casefold()
+        self._attr_unique_id = f"group:{key}:healthy"
+        self._attr_device_info = DeviceInfo(
+            identifiers={(DOMAIN, f"group:{key}")},
+            name=f"HA Probulator · {group}",
+            manufacturer="Gigabyte Grove",
+            model="HA Probulator Group",
+            sw_version=VERSION,
+        )
+
+    @property
+    def available(self) -> bool:
+        """Return whether the group still has loaded targets."""
+        return self._manager.group_snapshot(self._group)["total_targets"] > 0
+
+    @property
+    def is_on(self) -> bool:
+        """Return aggregate group health."""
+        return bool(self._manager.group_snapshot(self._group)["healthy"])
+
+    @property
+    def extra_state_attributes(self) -> dict[str, Any]:
+        """Expose group status counts and aggregate metrics."""
+        snapshot = self._manager.group_snapshot(self._group)
+        return {
+            "probulator": True,
+            "probulator_kind": "group",
+            "group": self._group,
+            **snapshot,
         }
