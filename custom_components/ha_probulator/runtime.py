@@ -18,6 +18,7 @@ STORAGE_VERSION = 1
 STORAGE_KEY = f"{DOMAIN}.runtime"
 SAVE_DELAY_SECONDS = 10
 DEFAULT_MAX_CONCURRENT_PROBES = 20
+OVERALL_GROUP = "Overall"
 
 _PERSISTED_METRIC_KEYS = (
     "total_probes",
@@ -103,24 +104,29 @@ class ProbulatorRuntimeManager:
             self._ensure_group_entities(platform)
 
     def groups(self) -> list[str]:
-        """Return normalized display names for currently loaded non-empty groups."""
-        return sorted(
+        """Return aggregate scopes, including the whole monitored estate."""
+        named = sorted(
             {
                 coordinator.group.strip()
                 for coordinator in self._coordinators.values()
                 if coordinator.group.strip()
+                and coordinator.group.strip().casefold() != OVERALL_GROUP.casefold()
             },
             key=str.casefold,
         )
+        return ([OVERALL_GROUP] if self._coordinators else []) + named
 
     def group_snapshot(self, group: str) -> dict[str, Any]:
         """Return aggregate health for one target group."""
         wanted = group.strip().casefold()
-        members = [
-            coordinator
-            for coordinator in self._coordinators.values()
-            if coordinator.group.strip().casefold() == wanted
-        ]
+        if wanted == OVERALL_GROUP.casefold():
+            members = list(self._coordinators.values())
+        else:
+            members = [
+                coordinator
+                for coordinator in self._coordinators.values()
+                if coordinator.group.strip().casefold() == wanted
+            ]
         counts = {
             "online": 0,
             "degraded": 0,
@@ -209,11 +215,8 @@ class ProbulatorRuntimeManager:
     def refresh_group_entities(self) -> None:
         """Refresh all group aggregate entities and discover newly added groups."""
         self._ensure_group_entities()
-        live_groups = {group.casefold() for group in self.groups()}
         for entities in self._group_entities.values():
-            for key, group_entities in entities.items():
-                if key not in live_groups:
-                    continue
+            for group_entities in entities.values():
                 for entity in group_entities:
                     entity.async_write_ha_state()
 
