@@ -1,0 +1,122 @@
+{
+  "title": "HA Probulator",
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a target",
+        "description": "Monitor a TCP service without relying on ICMP/ping.",
+        "data": {
+          "name": "Name",
+          "host": "Host or IP address",
+          "port": "TCP port"
+        },
+        "data_description": {
+          "name": "Friendly name used for the Home Assistant device.",
+          "host": "DNS name or IP address reachable from Home Assistant.",
+          "port": "TCP service port to probe."
+        }
+      },
+      "reconfigure": {
+        "title": "Reconfigure target",
+        "description": "Change the target name, host, or TCP port.",
+        "data": {
+          "name": "Name",
+          "host": "Host or IP address",
+          "port": "TCP port"
+        }
+      }
+    },
+    "error": {
+      "required": "This field is required.",
+      "invalid_host": "Enter a host name or IP address, not a URL."
+    },
+    "abort": {
+      "already_configured": "That host and TCP port are already being monitored.",
+      "reconfigure_successful": "Target configuration updated."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Monitoring options",
+        "description": "Tune polling, retry/debounce behavior, grouping, and latency thresholds.",
+        "data": {
+          "group": "Group",
+          "icon": "Icon",
+          "scan_interval": "Probe interval",
+          "timeout": "Connection timeout",
+          "retries": "Retries",
+          "retry_delay": "Delay between retries",
+          "failure_threshold": "Failures before offline",
+          "recovery_threshold": "Successes before recovery",
+          "warning_latency_ms": "Warning latency",
+          "critical_latency_ms": "Critical latency",
+          "statistics_window": "Statistics window"
+        },
+        "data_description": {
+          "group": "Optional label used by HA Probulator overview and summary cards.",
+          "icon": "Icon used by target entities and custom cards.",
+          "scan_interval": "Seconds between probe cycles.",
+          "timeout": "Seconds allowed for each TCP connection attempt.",
+          "retries": "Extra attempts within a probe cycle after the first attempt fails.",
+          "retry_delay": "Seconds to wait between retry attempts.",
+          "failure_threshold": "Consecutive failed probe cycles required before the target becomes offline.",
+          "recovery_threshold": "Consecutive successful probe cycles required before the target becomes online again.",
+          "warning_latency_ms": "Response time at or above this value is considered degraded.",
+          "critical_latency_ms": "Response time at or above this value is considered critical.",
+          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations."
+        }
+      }
+    },
+    "error": {
+      "critical_must_exceed_warning": "Critical latency must be greater than warning latency."
+    }
+  },
+  "entity": {
+    "binary_sensor": {
+      "reachable": {
+        "name": "Reachable"
+      }
+    },
+    "sensor": {
+      "response_time": {
+        "name": "Response time"
+      },
+      "average_response_time": {
+        "name": "Average response time"
+      },
+      "minimum_response_time": {
+        "name": "Minimum response time"
+      },
+      "maximum_response_time": {
+        "name": "Maximum response time"
+      },
+      "success_rate": {
+        "name": "Success rate"
+      },
+      "consecutive_failures": {
+        "name": "Consecutive failures"
+      },
+      "total_probes": {
+        "name": "Total probes"
+      },
+      "last_success": {
+        "name": "Last success"
+      },
+      "last_failure": {
+        "name": "Last failure"
+      },
+      "status": {
+        "name": "Status"
+      },
+      "quality": {
+        "name": "Quality"
+      }
+    },
+    "button": {
+      "probe_now": {
+        "name": "Probe now"
+      }
+    }
+  }
+}
