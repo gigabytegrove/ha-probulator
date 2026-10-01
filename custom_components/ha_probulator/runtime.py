@@ -172,9 +172,7 @@ class ProbulatorRuntimeManager:
             return "unknown"
         return str(coordinator.data.get("status", "unknown"))
 
-    def coordinator_for_target(
-        self, target_id: str
-    ) -> ProbulatorCoordinator | None:
+    def coordinator_for_target(self, target_id: str) -> ProbulatorCoordinator | None:
         """Return a live coordinator by stable target ID."""
         return self._coordinators.get(target_id)
 
