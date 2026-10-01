@@ -23,7 +23,7 @@ class ProbeMetricsTests(unittest.TestCase):
             success=success,
             latency_ms=latency,
             attempts=1,
-            error=None if success else "ConnectionRefusedError",
+            error=None if success else probe.ProbeError.REFUSED,
         )
 
     def test_success_sets_online_and_statistics(self) -> None:
@@ -32,7 +32,10 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(state["status"], "online")
         self.assertEqual(state["quality"], "good")
         self.assertEqual(state["average_response_time_ms"], 12.5)
+        self.assertEqual(state["p95_response_time_ms"], 12.5)
         self.assertEqual(state["success_rate"], 100.0)
+        self.assertEqual(state["last_check"], self.base)
+        self.assertEqual(state["last_status_change"], self.base)
 
     def test_failure_is_debounced_before_offline(self) -> None:
         self.metrics.record(self.sample(0, True, 10))
@@ -45,14 +48,24 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertFalse(second["reachable"])
         self.assertEqual(second["status"], "offline")
         self.assertEqual(second["consecutive_failures"], 2)
+        self.assertEqual(second["outage_started"], self.base + timedelta(seconds=2))
 
-    def test_success_recovers_after_offline(self) -> None:
+    def test_success_recovers_after_offline_and_records_outage(self) -> None:
         self.metrics.record(self.sample(0, False))
         self.metrics.record(self.sample(1, False))
-        recovered = self.metrics.record(self.sample(2, True, 20))
+        recovered = self.metrics.record(self.sample(6, True, 20))
         self.assertTrue(recovered["reachable"])
         self.assertEqual(recovered["status"], "online")
         self.assertEqual(recovered["consecutive_failures"], 0)
+        self.assertIsNone(recovered["outage_started"])
+        self.assertEqual(recovered["last_outage_duration_seconds"], 5.0)
+
+    def test_current_outage_duration_advances_on_checks(self) -> None:
+        self.metrics.record(self.sample(0, False))
+        offline = self.metrics.record(self.sample(1, False))
+        self.assertEqual(offline["current_outage_duration_seconds"], 0.0)
+        later = self.metrics.record(self.sample(11, False))
+        self.assertEqual(later["current_outage_duration_seconds"], 10.0)
 
     def test_latency_thresholds_mark_degraded(self) -> None:
         warning = self.metrics.record(self.sample(0, True, 150))
@@ -63,13 +76,15 @@ class ProbeMetricsTests(unittest.TestCase):
         self.assertEqual(critical["quality"], "critical")
         self.assertEqual(critical["status"], "degraded")
 
-    def test_rolling_window_limits_statistics(self) -> None:
+    def test_rolling_window_limits_statistics_and_p95(self) -> None:
         self.metrics.record(self.sample(0, True, 10))
         self.metrics.record(self.sample(1, True, 20))
         self.metrics.record(self.sample(2, False))
         state = self.metrics.record(self.sample(3, True, 40))
         self.assertEqual(state["average_response_time_ms"], 30.0)
+        self.assertEqual(state["p95_response_time_ms"], 40)
         self.assertAlmostEqual(state["success_rate"], 66.667, places=3)
+        self.assertEqual(state["window_samples"], 3)
         self.assertEqual(len(state["latency_history"]), 3)
 
 
