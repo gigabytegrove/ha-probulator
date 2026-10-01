@@ -1,0 +1,47 @@
+"""Constants for HA Probulator."""
+
+from __future__ import annotations
+
+DOMAIN = "ha_probulator"
+NAME = "HA Probulator"
+VERSION = "1.0.0"
+
+CONF_TARGET_ID = "target_id"
+CONF_GROUP = "group"
+CONF_ICON = "icon"
+CONF_SCAN_INTERVAL = "scan_interval"
+CONF_TIMEOUT = "timeout"
+CONF_RETRIES = "retries"
+CONF_RETRY_DELAY = "retry_delay"
+CONF_FAILURE_THRESHOLD = "failure_threshold"
+CONF_RECOVERY_THRESHOLD = "recovery_threshold"
+CONF_WARNING_LATENCY = "warning_latency_ms"
+CONF_CRITICAL_LATENCY = "critical_latency_ms"
+CONF_STATISTICS_WINDOW = "statistics_window"
+
+DEFAULT_PORT = 443
+DEFAULT_GROUP = ""
+DEFAULT_ICON = "mdi:lan-connect"
+DEFAULT_SCAN_INTERVAL = 30
+DEFAULT_TIMEOUT = 3.0
+DEFAULT_RETRIES = 1
+DEFAULT_RETRY_DELAY = 0.25
+DEFAULT_FAILURE_THRESHOLD = 2
+DEFAULT_RECOVERY_THRESHOLD = 1
+DEFAULT_WARNING_LATENCY = 150.0
+DEFAULT_CRITICAL_LATENCY = 500.0
+DEFAULT_STATISTICS_WINDOW = 120
+
+MIN_SCAN_INTERVAL = 5
+MAX_SCAN_INTERVAL = 3600
+MIN_TIMEOUT = 0.2
+MAX_TIMEOUT = 30.0
+MAX_RETRIES = 5
+MAX_THRESHOLD = 10
+MIN_STATISTICS_WINDOW = 10
+MAX_STATISTICS_WINDOW = 1000
+
+EVENT_STATUS_CHANGED = "ha_probulator_status_changed"
+
+CARD_PATH = "/ha_probulator/ha-probulator-cards.js"
+CARD_FILE = "ha-probulator-cards.js"
