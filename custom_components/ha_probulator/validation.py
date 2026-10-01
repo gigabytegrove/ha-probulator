@@ -139,6 +139,12 @@ def safe_retries_for_budget(*, timeout: float, retries: int, retry_delay: float)
     return safe_retries
 
 
+def validate_flap_settings(*, window: int, threshold: int) -> None:
+    """Reject a flap threshold that cannot occur inside its sample window."""
+    if threshold >= window:
+        raise ValidationError("flap_threshold_too_high")
+
+
 def format_target(host: str, port: int) -> str:
     """Return an unambiguous host:port display string, including IPv6 brackets."""
     display_host = f"[{host}]" if ":" in host and not host.startswith("[") else host
