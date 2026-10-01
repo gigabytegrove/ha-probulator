@@ -1,0 +1,145 @@
+"""Sensors for HA Probulator."""
+
+from __future__ import annotations
+
+from collections.abc import Callable
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any
+
+from homeassistant.components.sensor import (
+    SensorDeviceClass,
+    SensorEntity,
+    SensorEntityDescription,
+    SensorStateClass,
+)
+from homeassistant.config_entries import ConfigEntry
+from homeassistant.const import PERCENTAGE, UnitOfTime
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
+
+from .const import DOMAIN
+from .coordinator import ProbulatorCoordinator
+from .entity import ProbulatorEntity
+
+
+@dataclass(frozen=True, kw_only=True)
+class ProbulatorSensorDescription(SensorEntityDescription):
+    """Describe a Probulator sensor."""
+
+    value_fn: Callable[[dict[str, Any]], Any]
+
+
+SENSORS: tuple[ProbulatorSensorDescription, ...] = (
+    ProbulatorSensorDescription(
+        key="response_time_ms",
+        translation_key="response_time",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.get("response_time_ms"),
+    ),
+    ProbulatorSensorDescription(
+        key="average_response_time_ms",
+        translation_key="average_response_time",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.get("average_response_time_ms"),
+    ),
+    ProbulatorSensorDescription(
+        key="min_response_time_ms",
+        translation_key="minimum_response_time",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.get("min_response_time_ms"),
+    ),
+    ProbulatorSensorDescription(
+        key="max_response_time_ms",
+        translation_key="maximum_response_time",
+        native_unit_of_measurement=UnitOfTime.MILLISECONDS,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=1,
+        value_fn=lambda data: data.get("max_response_time_ms"),
+    ),
+    ProbulatorSensorDescription(
+        key="success_rate",
+        translation_key="success_rate",
+        native_unit_of_measurement=PERCENTAGE,
+        state_class=SensorStateClass.MEASUREMENT,
+        suggested_display_precision=2,
+        value_fn=lambda data: data.get("success_rate"),
+    ),
+    ProbulatorSensorDescription(
+        key="consecutive_failures",
+        translation_key="consecutive_failures",
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda data: data.get("consecutive_failures"),
+    ),
+    ProbulatorSensorDescription(
+        key="total_probes",
+        translation_key="total_probes",
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        entity_registry_enabled_default=False,
+        value_fn=lambda data: data.get("total_probes"),
+    ),
+    ProbulatorSensorDescription(
+        key="last_success",
+        translation_key="last_success",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_registry_enabled_default=False,
+        value_fn=lambda data: data.get("last_success"),
+    ),
+    ProbulatorSensorDescription(
+        key="last_failure",
+        translation_key="last_failure",
+        device_class=SensorDeviceClass.TIMESTAMP,
+        entity_registry_enabled_default=False,
+        value_fn=lambda data: data.get("last_failure"),
+    ),
+    ProbulatorSensorDescription(
+        key="status",
+        translation_key="status",
+        icon="mdi:state-machine",
+        value_fn=lambda data: data.get("status"),
+    ),
+    ProbulatorSensorDescription(
+        key="quality",
+        translation_key="quality",
+        icon="mdi:signal",
+        value_fn=lambda data: data.get("quality"),
+    ),
+)
+
+
+async def async_setup_entry(
+    hass: HomeAssistant,
+    entry: ConfigEntry,
+    async_add_entities: AddConfigEntryEntitiesCallback,
+) -> None:
+    """Set up target sensors."""
+    coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
+    async_add_entities(
+        [ProbulatorSensor(coordinator, entry, description) for description in SENSORS]
+    )
+
+
+class ProbulatorSensor(ProbulatorEntity, SensorEntity):
+    """One metric sensor."""
+
+    entity_description: ProbulatorSensorDescription
+
+    def __init__(
+        self,
+        coordinator: ProbulatorCoordinator,
+        entry: ConfigEntry,
+        description: ProbulatorSensorDescription,
+    ) -> None:
+        super().__init__(coordinator, entry, description.key)
+        self.entity_description = description
+
+    @property
+    def native_value(self) -> str | int | float | datetime | None:
+        """Return the current metric value."""
+        return self.entity_description.value_fn(self.coordinator.data)
