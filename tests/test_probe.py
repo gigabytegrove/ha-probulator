@@ -3,7 +3,7 @@
 import asyncio
 import errno
 import socket
-from unittest import IsolatedAsyncioTestCase
+from unittest import IsolatedAsyncioTestCase, main
 from unittest.mock import patch
 
 from _bootstrap import probe
@@ -118,16 +118,18 @@ class ProbeTests(IsolatedAsyncioTestCase):
         async def cancel(*args, **kwargs):
             raise asyncio.CancelledError
 
-        with patch.object(asyncio, "open_connection", cancel):
-            with self.assertRaises(asyncio.CancelledError):
-                await probe.async_tcp_probe(
-                    "example.invalid",
-                    443,
-                    timeout=1,
-                    retries=2,
-                    retry_delay=0,
-                )
+        with (
+            patch.object(asyncio, "open_connection", cancel),
+            self.assertRaises(asyncio.CancelledError),
+        ):
+            await probe.async_tcp_probe(
+                "example.invalid",
+                443,
+                timeout=1,
+                retries=2,
+                retry_delay=0,
+            )
 
 
 if __name__ == "__main__":
-    unittest.main()
+    main()
