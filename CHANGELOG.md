@@ -16,6 +16,7 @@ Hardening, observability, and distribution pass.
 - Added monitoring customization during initial target setup instead of silently forcing defaults.
 - Fixed duplicate detection during reconfiguration when only the friendly name changes.
 - Improved custom cards with status-first sorting, IPv6-safe target display, p95 latency, check/status timestamps, outage duration, and keyboard behavior.
+- Added native visual editors for Target, Overview, and Summary cards, including metric visibility and common theme controls.
 - Expanded the regression suite for validation, cancellation, failure classification, percentile statistics, debounce behavior, and outage tracking.
 - Pinned GitHub Actions to immutable commit SHAs and added Dependabot for action updates.
 - Added deterministic tagged-release packaging with manifest/tag verification and SHA-256 checksums.
