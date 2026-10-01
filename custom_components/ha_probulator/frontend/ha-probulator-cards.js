@@ -173,6 +173,10 @@ class ProbulatorFormEditor extends HTMLElement {
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._schema.length) return;
+    if (!customElements.get("ha-form")) {
+      customElements.whenDefined("ha-form").then(() => this._render());
+      return;
+    }
     this.shadowRoot.innerHTML = `
       <style>
         :host { display:block; padding:8px 0; }
@@ -194,6 +198,18 @@ class ProbulatorFormEditor extends HTMLElement {
 }
 
 class ProbulatorTargetEditor extends ProbulatorFormEditor {
+  setConfig(config) {
+    super.setConfig({
+      mode: "normal",
+      show_response: true,
+      show_average: true,
+      show_success: true,
+      show_p95: false,
+      show_sparkline: true,
+      ...config,
+    });
+  }
+
   constructor() {
     super();
     this.configure([
@@ -233,6 +249,10 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
 }
 
 class ProbulatorOverviewEditor extends ProbulatorFormEditor {
+  setConfig(config) {
+    super.setConfig({ title: "HA Probulator", sort: "status", ...config });
+  }
+
   constructor() {
     super();
     this.configure([
@@ -260,6 +280,10 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
 }
 
 class ProbulatorSummaryEditor extends ProbulatorFormEditor {
+  setConfig(config) {
+    super.setConfig({ title: "Network status", ...config });
+  }
+
   constructor() {
     super();
     this.configure([
