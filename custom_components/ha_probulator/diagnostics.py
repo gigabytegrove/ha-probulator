@@ -24,7 +24,7 @@ async def async_get_config_entry_diagnostics(
     coordinator: ProbulatorCoordinator = hass.data[DOMAIN][entry.entry_id]
     data = dict(coordinator.data)
     manager: ProbulatorRuntimeManager = hass.data[DOMAIN][DATA_MANAGER]
-    runtime = dict(manager._state(coordinator.target_id))
+    runtime = manager.runtime_snapshot(coordinator.target_id)
 
     for key, value in list(data.items()):
         if isinstance(value, datetime):
