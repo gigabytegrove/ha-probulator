@@ -1,14 +1,14 @@
 """Tests for HA Probulator rolling state and statistics."""
 
-from datetime import datetime, timedelta, timezone
 import unittest
+from datetime import UTC, datetime, timedelta
 
 from _bootstrap import metrics, probe
 
 
 class ProbeMetricsTests(unittest.TestCase):
     def setUp(self) -> None:
-        self.base = datetime(2026, 10, 1, 12, 0, tzinfo=timezone.utc)
+        self.base = datetime(2026, 10, 1, 12, 0, tzinfo=UTC)
         self.metrics = metrics.ProbeMetrics(
             window_size=3,
             failure_threshold=2,
