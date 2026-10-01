@@ -21,6 +21,7 @@ from .const import (
     CONF_RETRY_DELAY,
     CONF_SCAN_INTERVAL,
     CONF_STATISTICS_WINDOW,
+    CONF_TARGET_ID,
     CONF_TIMEOUT,
     CONF_WARNING_LATENCY,
     DEFAULT_CRITICAL_LATENCY,
@@ -39,6 +40,7 @@ from .const import (
 )
 from .metrics import ProbeMetrics
 from .probe import async_tcp_probe
+from .validation import format_target
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +50,7 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
 
     def __init__(self, hass: HomeAssistant, entry: ConfigEntry) -> None:
         self.entry = entry
+        self.target_id = str(entry.data.get(CONF_TARGET_ID, entry.entry_id))
         self.host = str(entry.data[CONF_HOST])
         self.port = int(entry.data[CONF_PORT])
         self.group = str(entry.options.get(CONF_GROUP, DEFAULT_GROUP)).strip()
@@ -99,9 +102,11 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         snapshot = self.metrics.record(sample)
         snapshot.update(
             {
+                "target_id": self.target_id,
                 "name": self.entry.title,
                 "host": self.host,
                 "port": self.port,
+                "target": format_target(self.host, self.port),
                 "group": self.group,
                 "icon": self.icon,
                 "scan_interval": int(
@@ -109,6 +114,7 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
                 ),
                 "timeout": self.timeout,
                 "retries": self.retries,
+                "retry_delay": self.retry_delay,
                 "failure_threshold": self.metrics.failure_threshold,
                 "recovery_threshold": self.metrics.recovery_threshold,
                 "warning_latency_ms": self.metrics.warning_latency_ms,
@@ -121,17 +127,22 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
             self.hass.bus.async_fire(
                 EVENT_STATUS_CHANGED,
                 {
+                    "target_id": self.target_id,
                     "entry_id": self.entry.entry_id,
                     "name": self.entry.title,
                     "host": self.host,
                     "port": self.port,
+                    "target": snapshot["target"],
                     "group": self.group,
                     "previous_status": previous_status,
                     "status": current_status,
                     "quality": snapshot["quality"],
                     "response_time_ms": snapshot["response_time_ms"],
+                    "p95_response_time_ms": snapshot["p95_response_time_ms"],
                     "success_rate": snapshot["success_rate"],
                     "consecutive_failures": snapshot["consecutive_failures"],
+                    "last_error": snapshot["last_error"],
+                    "checked_at": sample.timestamp.isoformat(),
                 },
             )
         self._has_sample = True
