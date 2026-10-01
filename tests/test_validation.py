@@ -7,7 +7,11 @@ from _bootstrap import validation
 
 class ValidationTests(unittest.TestCase):
     def test_ipv4_is_normalized(self) -> None:
-        self.assertEqual(validation.normalize_host(" 192.168.001.001 "), "192.168.001.001")
+        self.assertEqual(validation.normalize_host(" 192.168.1.1 "), "192.168.1.1")
+
+    def test_ambiguous_ipv4_with_leading_zeroes_is_rejected(self) -> None:
+        with self.assertRaisesRegex(validation.ValidationError, "invalid_host"):
+            validation.normalize_host("192.168.001.001")
 
     def test_ipv6_brackets_are_removed_and_display_is_unambiguous(self) -> None:
         host = validation.normalize_host("[2001:db8::1]")
