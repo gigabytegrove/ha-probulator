@@ -23,3 +23,4 @@ if "custom_components.ha_probulator" not in sys.modules:
 
 probe = importlib.import_module("custom_components.ha_probulator.probe")
 metrics = importlib.import_module("custom_components.ha_probulator.metrics")
+validation = importlib.import_module("custom_components.ha_probulator.validation")
