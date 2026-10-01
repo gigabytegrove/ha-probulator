@@ -220,7 +220,7 @@ stat_types:
 
 ## Custom cards
 
-The dashboard card bundle is shipped inside the integration and registered automatically when Home Assistant loads HA Probulator. No separate card repository is required. All three cards now include visual Home Assistant card editors, so their common settings can be configured from the dashboard UI instead of requiring YAML.
+The dashboard card bundle is shipped inside the integration and registered automatically when Home Assistant loads HA Probulator. No separate card repository is required. All four cards now include visual Home Assistant card editors, so their common settings can be configured from the dashboard UI instead of requiring YAML.
 
 ### Target card
 
@@ -314,7 +314,7 @@ sort: status
 show_actions: true
 ```
 
-It supports live search, group filtering, status-first sorting, and per-target **Probe**, **Maintenance**, and **Enable/Disable** actions directly from the dashboard. Those buttons call HA Probulator's native administrator-only Home Assistant actions; the card is not maintaining a separate state model.
+It supports live search, group filtering, status-first sorting, per-target **Probe**, **Maintenance**, and **Enable/Disable** actions, plus multi-select bulk operations with **Select visible**, **Probe**, **Maintenance**, **End maintenance**, **Enable**, and **Disable**. Those buttons call HA Probulator's native administrator-only Home Assistant actions; the card is not maintaining a separate state model.
 
 ## Themes
 
