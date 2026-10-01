@@ -142,8 +142,12 @@ if (!target.shadowRoot.innerHTML.includes("&lt;img")) {
 }
 
 const ManagerCard = registry.get("probulator-manager-card");
+const managerStub = ManagerCard.getStubConfig();
+if (managerStub.show_bulk_actions !== true) {
+  throw new Error("manager card bulk actions are not enabled by default");
+}
 const manager = new ManagerCard();
-manager.setConfig({ title: "Manager", show_actions: true });
+manager.setConfig({ title: "Manager", show_actions: true, show_bulk_actions: true });
 
 let invalidModeRejected = false;
 try {
