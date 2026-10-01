@@ -72,6 +72,7 @@ from .validation import (
     normalize_group,
     normalize_host,
     normalize_name,
+    validate_flap_settings,
     validate_probe_budget,
 )
 
@@ -380,8 +381,13 @@ def _normalize_options(
     if values[CONF_CRITICAL_LATENCY] <= values[CONF_WARNING_LATENCY]:
         errors[CONF_CRITICAL_LATENCY] = "critical_must_exceed_warning"
 
-    if values[CONF_FLAP_THRESHOLD] >= values[CONF_FLAP_WINDOW]:
-        errors[CONF_FLAP_THRESHOLD] = "flap_threshold_too_high"
+    try:
+        validate_flap_settings(
+            window=values[CONF_FLAP_WINDOW],
+            threshold=values[CONF_FLAP_THRESHOLD],
+        )
+    except ValidationError as exc:
+        errors[CONF_FLAP_THRESHOLD] = exc.code
 
     try:
         validate_probe_budget(
