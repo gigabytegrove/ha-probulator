@@ -107,6 +107,17 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
                 "current_outage_duration_seconds"
             ),
             "last_outage_duration_seconds": data.get("last_outage_duration_seconds"),
+            "outage_count": data.get("outage_count"),
+            "total_outage_duration_seconds": data.get(
+                "total_outage_duration_seconds"
+            ),
+            "longest_outage_duration_seconds": data.get(
+                "longest_outage_duration_seconds"
+            ),
+            "mean_outage_duration_seconds": data.get(
+                "mean_outage_duration_seconds"
+            ),
+            "stable_since": iso("stable_since"),
             "last_error": data.get("last_error"),
             "attempts": data.get("attempts"),
             "scan_interval": data.get("scan_interval"),
