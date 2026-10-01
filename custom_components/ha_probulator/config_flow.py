@@ -536,6 +536,64 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
+    async def async_step_import(
+        self, import_data: dict[str, Any]
+    ) -> ConfigFlowResult:
+        """Create a target from a validated portable/clone payload."""
+        preset_key = str(import_data.get(CONF_PRESET, DEFAULT_PRESET))
+        target_input = {
+            CONF_NAME: import_data.get(CONF_NAME, ""),
+            CONF_HOST: import_data.get(CONF_HOST, ""),
+            CONF_PORT: import_data.get(
+                CONF_PORT,
+                get_preset(preset_key).port,
+            ),
+        }
+        target, target_errors = _normalize_target_input(target_input)
+        if target_errors:
+            return self.async_abort(reason="invalid_import")
+
+        self._async_abort_entries_match(
+            {CONF_HOST: target[CONF_HOST], CONF_PORT: target[CONF_PORT]}
+        )
+
+        raw_options = import_data.get("options", {})
+        if not isinstance(raw_options, dict):
+            return self.async_abort(reason="invalid_import")
+
+        merged_options = {
+            **_default_options(preset_key),
+            **raw_options,
+        }
+
+        dependency = str(
+            merged_options.get(CONF_DEPENDENCY_TARGET_ID, "") or ""
+        ).strip()
+        if dependency:
+            known_target_ids = {
+                str(entry.data.get(CONF_TARGET_ID, entry.entry_id))
+                for entry in self.hass.config_entries.async_entries(DOMAIN)
+            }
+            if dependency not in known_target_ids:
+                merged_options[CONF_DEPENDENCY_TARGET_ID] = ""
+
+        options, option_errors = _normalize_options(merged_options)
+        if option_errors:
+            return self.async_abort(reason="invalid_import")
+
+        target_id = uuid4().hex
+        await self.async_set_unique_id(target_id)
+        return self.async_create_entry(
+            title=target[CONF_NAME],
+            data={
+                CONF_TARGET_ID: target_id,
+                CONF_PRESET: preset_key,
+                CONF_HOST: target[CONF_HOST],
+                CONF_PORT: target[CONF_PORT],
+            },
+            options=options,
+        )
+
     async def async_step_reconfigure(
         self, user_input: dict[str, Any] | None = None
     ) -> ConfigFlowResult:
