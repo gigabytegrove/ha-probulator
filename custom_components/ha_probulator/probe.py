@@ -5,6 +5,22 @@ from __future__ import annotations
 import asyncio
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import StrEnum
+import errno
+import socket
+
+
+class ProbeError(StrEnum):
+    """Stable, non-sensitive probe failure categories."""
+
+    TIMEOUT = "timeout"
+    DNS = "dns_error"
+    REFUSED = "connection_refused"
+    NETWORK_UNREACHABLE = "network_unreachable"
+    HOST_UNREACHABLE = "host_unreachable"
+    CONNECTION_RESET = "connection_reset"
+    INVALID_TARGET = "invalid_target"
+    CONNECTION_ERROR = "connection_error"
 
 
 @dataclass(frozen=True, slots=True)
@@ -16,6 +32,30 @@ class ProbeSample:
     latency_ms: float | None
     attempts: int
     error: str | None = None
+
+
+def _classify_error(exc: BaseException) -> str:
+    """Convert an exception into a stable error code without leaking raw details."""
+    if isinstance(exc, TimeoutError):
+        return ProbeError.TIMEOUT
+    if isinstance(exc, socket.gaierror):
+        return ProbeError.DNS
+    if isinstance(exc, ConnectionRefusedError):
+        return ProbeError.REFUSED
+    if isinstance(exc, ConnectionResetError):
+        return ProbeError.CONNECTION_RESET
+    if isinstance(exc, (ValueError, UnicodeError)):
+        return ProbeError.INVALID_TARGET
+    if isinstance(exc, OSError):
+        if exc.errno == errno.ENETUNREACH:
+            return ProbeError.NETWORK_UNREACHABLE
+        if exc.errno == errno.EHOSTUNREACH:
+            return ProbeError.HOST_UNREACHABLE
+        if exc.errno == errno.ECONNREFUSED:
+            return ProbeError.REFUSED
+        if exc.errno == errno.ECONNRESET:
+            return ProbeError.CONNECTION_RESET
+    return ProbeError.CONNECTION_ERROR
 
 
 async def async_tcp_probe(
@@ -41,7 +81,13 @@ async def async_tcp_probe(
         started = loop.time()
         try:
             _reader, writer = await asyncio.wait_for(
-                asyncio.open_connection(host=host, port=port), timeout=timeout
+                asyncio.open_connection(
+                    host=host,
+                    port=port,
+                    happy_eyeballs_delay=0.25,
+                    interleave=1,
+                ),
+                timeout=timeout,
             )
             latency_ms = round((loop.time() - started) * 1000.0, 3)
             return ProbeSample(
@@ -50,9 +96,10 @@ async def async_tcp_probe(
                 latency_ms=latency_ms,
                 attempts=attempt,
             )
-        except (TimeoutError, asyncio.TimeoutError, OSError) as exc:
-            message = str(exc).strip()
-            last_error = type(exc).__name__ + (f": {message}" if message else "")
+        except asyncio.CancelledError:
+            raise
+        except (TimeoutError, OSError, ValueError, UnicodeError) as exc:
+            last_error = _classify_error(exc)
         finally:
             if writer is not None:
                 writer.close()
@@ -69,5 +116,5 @@ async def async_tcp_probe(
         success=False,
         latency_ms=None,
         attempts=attempts,
-        error=last_error or "Connection failed",
+        error=last_error or ProbeError.CONNECTION_ERROR,
     )
