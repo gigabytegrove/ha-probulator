@@ -172,6 +172,9 @@
       },
       "last_outage_duration": {
         "name": "Last outage duration"
+      },
+      "jitter": {
+        "name": "Jitter"
       }
     },
     "button": {
