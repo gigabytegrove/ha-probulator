@@ -13,8 +13,8 @@ The name is intentionally a little ridiculous. The monitoring is not.
 - Requires no external monitoring server, daemon, database, or Uptime Kuma installation.
 - Configures targets entirely through the Home Assistant UI.
 - Supports retries, connection timeouts, failure/recovery debounce thresholds, and configurable polling intervals.
-- Tracks current, average, minimum, and maximum response time.
-- Tracks rolling probe success rate and failure counts.
+- Tracks current, average, minimum, maximum, and 95th-percentile response time.
+- Tracks rolling probe success rate, probe counters, status-change times, and outage duration.
 - Exposes target state as normal Home Assistant entities and attributes.
 - Includes an immediate **Probe now** button for every target.
 - Includes optional HA Probulator dashboard cards with Home Assistant theme support.
@@ -60,7 +60,7 @@ Each HA Probulator config entry represents one monitored TCP endpoint. Enter:
 
 The target does not need to be online while you add it. HA Probulator is specifically intended to monitor failures, so setup does not reject an endpoint merely because it is currently unavailable.
 
-After setup, use **Configure** to adjust polling/retry behavior and **Reconfigure** to change the target name, host, or port.
+Setup now includes a second **Monitoring options** step so the polling interval, retry/debounce behavior, thresholds, group, and icon can be customized before the target is created. After setup, use **Configure** to adjust those monitoring options and **Reconfigure** to change the target name, host, or port.
 
 ## Monitoring options
 
@@ -77,6 +77,8 @@ After setup, use **Configure** to adjust polling/retry behavior and **Reconfigur
 | Statistics window | 120 probes | Rolling sample count used for latency and success-rate statistics |
 | Group | blank | Optional label used by overview/summary cards |
 
+HA Probulator rejects timeout/retry combinations whose theoretical worst-case probe cycle exceeds 60 seconds. This prevents a single misconfigured target from tying up its coordinator for minutes at a time.
+
 ## Home Assistant entities
 
 Every target is represented as a Home Assistant device. Entity IDs are generated normally by Home Assistant from the device/entity names, so a target named `Core Router` will typically produce entities similar to:
@@ -85,10 +87,13 @@ Every target is represented as a Home Assistant device. Entity IDs are generated
 binary_sensor.core_router_reachable
 sensor.core_router_response_time
 sensor.core_router_average_response_time
+sensor.core_router_95th_percentile_response_time
 sensor.core_router_minimum_response_time
 sensor.core_router_maximum_response_time
 sensor.core_router_success_rate
 sensor.core_router_consecutive_failures
+sensor.core_router_last_check
+sensor.core_router_current_outage_duration
 sensor.core_router_status
 sensor.core_router_quality
 button.core_router_probe_now
@@ -108,6 +113,7 @@ status
 quality
 response_time_ms
 average_response_time_ms
+p95_response_time_ms
 min_response_time_ms
 max_response_time_ms
 success_rate
@@ -116,8 +122,13 @@ consecutive_successes
 total_probes
 successful_probes
 failed_probes
+last_check
+last_status_change
 last_success
 last_failure
+outage_started
+current_outage_duration_seconds
+last_outage_duration_seconds
 last_error
 attempts
 scan_interval
@@ -182,7 +193,7 @@ Supported modes:
 
 - `minimal` — name/status and current response time.
 - `normal` — status plus current/average response time and success rate.
-- `extended` — the full target view, including host/port, group, min/max response time, failure information, timestamps, last error, and a recent latency sparkline.
+- `extended` — the full target view, including host/port, group, min/p95/max response time, failure information, last check/status change, outage duration, timestamps, sanitized last-error category, and a recent latency sparkline.
 
 Optional presentation overrides:
 
@@ -204,7 +215,10 @@ Auto-discovers every HA Probulator target:
 ```yaml
 type: custom:probulator-overview-card
 title: Network
+sort: status
 ```
+
+`sort: status` (the default) puts offline and degraded targets first. Use `sort: name` for alphabetical ordering.
 
 Filter by group:
 
@@ -307,7 +321,7 @@ HA Probulator also emits:
 ha_probulator_status_changed
 ```
 
-Event data contains the config entry ID, target name, host, port, group, previous status, new status, quality, response time, rolling success rate, and consecutive failure count.
+Event data contains a stable target ID, config entry ID, target name/address, group, previous/new status, quality, current and p95 response time, rolling success rate, consecutive failure count, sanitized failure category, and check timestamp.
 
 ## Status behavior
 
@@ -323,7 +337,7 @@ Latency at or above the warning/critical thresholds also produces a `degraded` s
 
 ## Probe model
 
-HA Probulator 1.0 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
+HA Probulator 1.1 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
 
 This is deliberate. TCP monitoring is small, local, predictable, and works with devices that do not answer ICMP echo requests.
 
@@ -331,12 +345,14 @@ This is deliberate. TCP monitoring is small, local, predictable, and works with 
 
 HA Probulator runs entirely inside Home Assistant. It does not send monitoring data to Gigabyte Grove or any third-party service. It only attempts TCP connections to the targets you configure.
 
+Host names and IP addresses are redacted from Home Assistant diagnostics intended for sharing. Probe failures are exposed as stable categories such as `timeout`, `dns_error`, or `connection_refused`; raw operating-system exception text is not placed into entity attributes or dashboard cards.
+
 ## Development
 
 Validation includes:
 
 - Python bytecode compilation.
-- Unit tests for probe retry/latency behavior and state/debounce/statistics behavior.
+- Unit tests for retry/cancellation/error classification, input hardening, IPv4/IPv6/IDNA handling, debounce/outage behavior, and rolling statistics.
 - JSON validation.
 - JavaScript syntax validation.
 - Home Assistant Hassfest.
@@ -345,3 +361,9 @@ Validation includes:
 ## License
 
 MIT. See [LICENSE](LICENSE).
+
+## Release integrity
+
+Tagged releases are built only when the tag version matches the integration manifest. The release workflow produces a deterministic `ha-probulator-vX.Y.Z.zip` and a `SHA256SUMS` file so manual downloads can be verified.
+
+CI dependencies are pinned to immutable commit SHAs and Dependabot is configured to propose updates rather than silently following moving action branches.
