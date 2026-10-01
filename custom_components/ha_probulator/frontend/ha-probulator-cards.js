@@ -205,6 +205,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       show_average: true,
       show_success: true,
       show_p95: false,
+      show_jitter: false,
       show_sparkline: true,
       ...config,
     });
@@ -221,6 +222,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       { name: "show_average", selector: { boolean: {} } },
       { name: "show_success", selector: { boolean: {} } },
       { name: "show_p95", selector: { boolean: {} } },
+      { name: "show_jitter", selector: { boolean: {} } },
       { name: "show_sparkline", selector: { boolean: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
@@ -237,6 +239,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       show_average: "Show average response time",
       show_success: "Show success rate",
       show_p95: "Show 95th percentile",
+      show_jitter: "Show jitter",
       show_sparkline: "Show latency sparkline (Extended)",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
@@ -339,6 +342,7 @@ class ProbulatorCard extends HTMLElement {
       show_average: true,
       show_success: true,
       show_p95: false,
+      show_jitter: false,
       show_sparkline: true,
     };
   }
@@ -355,6 +359,7 @@ class ProbulatorCard extends HTMLElement {
       show_average: true,
       show_success: true,
       show_p95: false,
+      show_jitter: false,
       show_sparkline: true,
       ...config,
     };
@@ -411,6 +416,7 @@ class ProbulatorCard extends HTMLElement {
           <div class="label">Group</div><div class="value">${esc(a.group || "—")}</div>
           <div class="label">Minimum</div><div class="value">${fmtMs(a.min_response_time_ms)}</div>
           <div class="label">95th percentile</div><div class="value">${fmtMs(a.p95_response_time_ms)}</div>
+          <div class="label">Jitter</div><div class="value">${fmtMs(a.jitter_ms)}</div>
           <div class="label">Maximum</div><div class="value">${fmtMs(a.max_response_time_ms)}</div>
           <div class="label">Failures</div><div class="value">${esc(a.failed_probes ?? "—")} total / ${esc(a.consecutive_failures ?? 0)} consecutive</div>
           <div class="label">Last check</div><div class="value">${esc(fmtTime(a.last_check))}</div>
@@ -439,6 +445,7 @@ class ProbulatorCard extends HTMLElement {
               ${this._config.show_average !== false ? `<div class="metric"><div class="value">${fmtMs(a.average_response_time_ms)}</div><div class="label">Average</div></div>` : ""}
               ${this._config.show_success !== false ? `<div class="metric"><div class="value">${fmtPct(a.success_rate)}</div><div class="label">Success</div></div>` : ""}
               ${this._config.show_p95 === true ? `<div class="metric"><div class="value">${fmtMs(a.p95_response_time_ms)}</div><div class="label">95th percentile</div></div>` : ""}
+              ${this._config.show_jitter === true ? `<div class="metric"><div class="value">${fmtMs(a.jitter_ms)}</div><div class="label">Jitter</div></div>` : ""}
             </div>
             ${extended}
           </div>
