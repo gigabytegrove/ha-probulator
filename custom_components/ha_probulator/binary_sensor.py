@@ -12,7 +12,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers.entity_platform import AddConfigEntryEntitiesCallback
 
-from .const import DOMAIN
+from .const import DOMAIN, VERSION
 from .coordinator import ProbulatorCoordinator
 from .entity import ProbulatorEntity
 
@@ -65,6 +65,7 @@ class ProbulatorReachableSensor(ProbulatorEntity, BinarySensorEntity):
         return {
             "probulator": True,
             "probulator_kind": "target",
+            "integration_version": VERSION,
             "target_id": data.get("target_id"),
             "target_name": self._entry.title,
             "target": data.get("target"),
