@@ -222,6 +222,12 @@
       },
       "current_scan_interval": {
         "name": "Current probe interval"
+      },
+      "probe_cycle": {
+        "name": "Probe cycle duration"
+      },
+      "probe_queue_wait": {
+        "name": "Probe queue wait"
       }
     },
     "button": {
