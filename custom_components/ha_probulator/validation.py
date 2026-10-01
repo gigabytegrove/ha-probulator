@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from ipaddress import ip_address
 import re
+from ipaddress import ip_address
 from typing import Any
 
 from .const import (
@@ -63,6 +63,9 @@ def normalize_host(value: Any) -> str:
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1].strip()
 
+    if host.endswith("."):
+        host = host[:-1]
+
     if not host or len(host) > MAX_HOST_LENGTH:
         raise ValidationError("host_too_long" if host else "required")
     if "://" in host or any(char in host for char in _FORBIDDEN_HOST_CHARS):
@@ -87,11 +90,6 @@ def normalize_host(value: Any) -> str:
     if ":" in host:
         raise ValidationError("invalid_host")
 
-    if host.endswith("."):
-        host = host[:-1]
-    if not host:
-        raise ValidationError("invalid_host")
-
     try:
         ascii_host = host.encode("idna").decode("ascii").lower()
     except UnicodeError as exc:
@@ -101,7 +99,10 @@ def normalize_host(value: Any) -> str:
         raise ValidationError("host_too_long")
 
     labels = ascii_host.split(".")
-    if any(not label or len(label) > 63 or not _HOST_LABEL.fullmatch(label) for label in labels):
+    if any(
+        not label or len(label) > 63 or not _HOST_LABEL.fullmatch(label)
+        for label in labels
+    ):
         raise ValidationError("invalid_host")
 
     return ascii_host
