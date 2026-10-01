@@ -83,6 +83,7 @@ class ProbeMetricsTests(unittest.TestCase):
         state = self.metrics.record(self.sample(3, True, 40))
         self.assertEqual(state["average_response_time_ms"], 30.0)
         self.assertEqual(state["p95_response_time_ms"], 40)
+        self.assertEqual(state["jitter_ms"], 20.0)
         self.assertAlmostEqual(state["success_rate"], 66.667, places=3)
         self.assertEqual(state["window_samples"], 3)
         self.assertEqual(len(state["latency_history"]), 3)
