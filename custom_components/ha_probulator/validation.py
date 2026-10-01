@@ -80,9 +80,7 @@ def normalize_host(value: Any) -> str:
 
     # Do not reinterpret a malformed dotted-quad as a DNS name. This avoids
     # platform-dependent legacy numeric-address parsing (for example leading zeros).
-    if host.count(".") == 3 and all(
-        label.isdigit() for label in host.split(".")
-    ):
+    if host.count(".") == 3 and all(label.isdigit() for label in host.split(".")):
         raise ValidationError("invalid_host")
 
     # A colon that is not part of a valid IP address usually means host:port or an
@@ -115,9 +113,10 @@ def probe_cycle_seconds(*, timeout: float, retries: int, retry_delay: float) -> 
 
 def validate_probe_budget(*, timeout: float, retries: int, retry_delay: float) -> None:
     """Reject configurations that can monopolize one coordinator for too long."""
-    if probe_cycle_seconds(
-        timeout=timeout, retries=retries, retry_delay=retry_delay
-    ) > MAX_PROBE_CYCLE_SECONDS:
+    if (
+        probe_cycle_seconds(timeout=timeout, retries=retries, retry_delay=retry_delay)
+        > MAX_PROBE_CYCLE_SECONDS
+    ):
         raise ValidationError("probe_budget_too_large")
 
 
@@ -127,11 +126,15 @@ def safe_retries_for_budget(*, timeout: float, retries: int, retry_delay: float)
     This protects entries created by older versions before budget validation existed.
     """
     safe_retries = max(0, retries)
-    while safe_retries > 0 and probe_cycle_seconds(
-        timeout=timeout,
-        retries=safe_retries,
-        retry_delay=retry_delay,
-    ) > MAX_PROBE_CYCLE_SECONDS:
+    while (
+        safe_retries > 0
+        and probe_cycle_seconds(
+            timeout=timeout,
+            retries=safe_retries,
+            retry_delay=retry_delay,
+        )
+        > MAX_PROBE_CYCLE_SECONDS
+    ):
         safe_retries -= 1
     return safe_retries
 
