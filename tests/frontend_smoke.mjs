@@ -88,7 +88,11 @@ for (const type of [
 
 const TargetCard = registry.get("probulator-card");
 const targetStub = TargetCard.getStubConfig();
-if (targetStub.mode !== "normal" || targetStub.show_sparkline !== true) {
+if (
+  targetStub.mode !== "normal"
+  || targetStub.show_sparkline !== true
+  || targetStub.show_jitter !== false
+) {
   throw new Error("unexpected target card stub defaults");
 }
 
