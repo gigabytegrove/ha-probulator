@@ -40,7 +40,7 @@ from .const import (
 )
 from .metrics import ProbeMetrics
 from .probe import async_tcp_probe
-from .validation import format_target
+from .validation import format_target, safe_retries_for_budget
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -56,10 +56,22 @@ class ProbulatorCoordinator(DataUpdateCoordinator[dict[str, Any]]):
         self.group = str(entry.options.get(CONF_GROUP, DEFAULT_GROUP)).strip()
         self.icon = str(entry.options.get(CONF_ICON, DEFAULT_ICON)).strip() or DEFAULT_ICON
         self.timeout = float(entry.options.get(CONF_TIMEOUT, DEFAULT_TIMEOUT))
-        self.retries = int(entry.options.get(CONF_RETRIES, DEFAULT_RETRIES))
+        configured_retries = int(entry.options.get(CONF_RETRIES, DEFAULT_RETRIES))
         self.retry_delay = float(
             entry.options.get(CONF_RETRY_DELAY, DEFAULT_RETRY_DELAY)
         )
+        self.retries = safe_retries_for_budget(
+            timeout=self.timeout,
+            retries=configured_retries,
+            retry_delay=self.retry_delay,
+        )
+        if self.retries != configured_retries:
+            _LOGGER.warning(
+                "Reduced HA Probulator retry count from %s to %s because the stored "
+                "configuration exceeds the 60-second probe-cycle safety budget",
+                configured_retries,
+                self.retries,
+            )
         self._has_sample = False
 
         self.metrics = ProbeMetrics(
