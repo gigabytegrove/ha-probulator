@@ -103,8 +103,6 @@ clone_target:
 export_config:
   name: Export configuration
   description: Return a portable HA Probulator configuration bundle and formatted JSON.
-  response:
-    optional: false
 
 import_config:
   name: Import configuration
@@ -116,11 +114,7 @@ import_config:
       description: JSON text or a parsed HA Probulator export object.
       selector:
         object:
-  response:
-    optional: false
 
 suggest_targets:
   name: Suggest targets
   description: Return possible monitoring targets from host/IP attributes Home Assistant already knows. This performs no subnet or port scan.
-  response:
-    optional: false
