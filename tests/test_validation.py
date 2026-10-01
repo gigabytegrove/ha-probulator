@@ -19,7 +19,10 @@ class ValidationTests(unittest.TestCase):
         self.assertEqual(validation.format_target(host, 443), "[2001:db8::1]:443")
 
     def test_dns_name_is_idna_normalized(self) -> None:
-        self.assertEqual(validation.normalize_host("BÜCHER.Example."), "xn--bcher-kva.example")
+        self.assertEqual(
+            validation.normalize_host("BÜCHER.Example."),
+            "xn--bcher-kva.example",
+        )
 
     def test_url_is_rejected(self) -> None:
         with self.assertRaisesRegex(validation.ValidationError, "invalid_host"):
