@@ -34,8 +34,10 @@ from .const import (
     SERVICE_PROBE,
     SERVICE_SET_MONITORING,
     SERVICE_START_MAINTENANCE,
+    SERVICE_SUGGEST_TARGETS,
 )
 from .runtime import ProbulatorRuntimeManager
+from .validation import ValidationError, normalize_host
 
 ATTR_TARGET_ID = "target_id"
 ATTR_GROUP = "group"
@@ -300,6 +302,77 @@ async def _async_clone_target(
     }
 
 
+
+async def _async_suggest_targets(
+    hass: HomeAssistant,
+    call: ServiceCall,
+) -> ServiceResponse:
+    """Return non-invasive target suggestions from data Home Assistant already knows."""
+    manager = _manager(hass)
+    monitored: dict[str, set[int]] = {}
+    for coordinator in manager.select_targets():
+        monitored.setdefault(coordinator.host.casefold(), set()).add(coordinator.port)
+
+    candidate_attributes = (
+        "ip_address",
+        "ip",
+        "host",
+        "hostname",
+        "address",
+    )
+    candidates: dict[tuple[str, int], dict[str, Any]] = {}
+
+    for state in hass.states.async_all():
+        attrs = state.attributes
+        for attribute in candidate_attributes:
+            raw_host = attrs.get(attribute)
+            if not isinstance(raw_host, str) or not raw_host.strip():
+                continue
+            try:
+                host = normalize_host(raw_host)
+            except ValidationError:
+                continue
+
+            raw_port = attrs.get("port")
+            try:
+                port = int(raw_port) if raw_port is not None else 443
+            except (TypeError, ValueError):
+                port = 443
+            if port < 1 or port > 65535:
+                port = 443
+
+            key = (host.casefold(), port)
+            if key in candidates:
+                continue
+            candidates[key] = {
+                "name": str(attrs.get("friendly_name") or state.entity_id),
+                "host": host,
+                "port": port,
+                "source_entity": state.entity_id,
+                "source_attribute": attribute,
+                "suggested_preset": "generic",
+                "already_monitored": port in monitored.get(host.casefold(), set()),
+                "monitored_ports": sorted(monitored.get(host.casefold(), set())),
+            }
+
+    ordered = sorted(
+        candidates.values(),
+        key=lambda item: (
+            item["already_monitored"],
+            str(item["name"]).casefold(),
+            str(item["host"]).casefold(),
+            int(item["port"]),
+        ),
+    )
+    return {
+        "candidates": ordered[:250],
+        "candidate_count": min(len(ordered), 250),
+        "truncated": len(ordered) > 250,
+        "method": "home_assistant_known_attributes",
+        "network_scan_performed": False,
+    }
+
+
 def async_setup_services(hass: HomeAssistant) -> None:
     """Register administrator-only HA Probulator actions."""
     async_register_admin_service(
@@ -374,5 +447,12 @@ def async_setup_services(hass: HomeAssistant) -> None:
                 ),
             }
         ),
+        supports_response=SupportsResponse.ONLY,
+    )
+    async_register_admin_service(
+        hass,
+        DOMAIN,
+        SERVICE_SUGGEST_TARGETS,
+        partial(_async_suggest_targets, hass),
         supports_response=SupportsResponse.ONLY,
     )
