@@ -536,9 +536,7 @@ class ProbulatorConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             errors=errors,
         )
 
-    async def async_step_import(
-        self, import_data: dict[str, Any]
-    ) -> ConfigFlowResult:
+    async def async_step_import(self, import_data: dict[str, Any]) -> ConfigFlowResult:
         """Create a target from a validated portable/clone payload."""
         preset_key = str(import_data.get(CONF_PRESET, DEFAULT_PRESET))
         target_input = {
