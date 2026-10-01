@@ -11,6 +11,7 @@ Hardening, observability, and distribution pass.
 - Replaced raw operating-system exception strings with stable probe failure categories.
 - Preserved task cancellation correctly and enabled Happy Eyeballs connection behavior for dual-stack hostnames.
 - Added p95 response time, last check, last status change, successful/failed probe counters, and current/last outage duration.
+- Added rolling TCP latency jitter as a native Home Assistant sensor, attribute, and optional card metric.
 - Expanded `ha_probulator_status_changed` event data with stable target IDs, p95 latency, sanitized failure category, and check timestamp.
 - Redacted monitored hosts/targets from Home Assistant diagnostics intended for sharing.
 - Added monitoring customization during initial target setup instead of silently forcing defaults.
