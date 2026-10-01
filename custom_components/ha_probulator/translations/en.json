@@ -24,15 +24,52 @@
           "host": "Host or IP address",
           "port": "TCP port"
         }
+      },
+      "monitoring": {
+        "title": "Monitoring options",
+        "description": "Choose how HA Probulator should probe this target. These settings can be changed later.",
+        "data": {
+          "group": "Group",
+          "icon": "Icon",
+          "scan_interval": "Probe interval",
+          "timeout": "Connection timeout",
+          "retries": "Retries",
+          "retry_delay": "Delay between retries",
+          "failure_threshold": "Failures before offline",
+          "recovery_threshold": "Successes before recovery",
+          "warning_latency_ms": "Warning latency",
+          "critical_latency_ms": "Critical latency",
+          "statistics_window": "Statistics window"
+        },
+        "data_description": {
+          "group": "Optional label used by HA Probulator overview and summary cards.",
+          "icon": "Icon used by target entities and custom cards.",
+          "scan_interval": "Seconds between probe cycles.",
+          "timeout": "Seconds allowed for each TCP connection attempt.",
+          "retries": "Extra attempts within a probe cycle after the first attempt fails.",
+          "retry_delay": "Seconds to wait between retry attempts.",
+          "failure_threshold": "Consecutive failed probe cycles required before the target becomes offline.",
+          "recovery_threshold": "Consecutive successful probe cycles required before the target becomes online again.",
+          "warning_latency_ms": "Response time at or above this value is considered degraded.",
+          "critical_latency_ms": "Response time at or above this value is considered critical.",
+          "statistics_window": "Number of probe cycles retained for rolling latency and success-rate calculations."
+        }
       }
     },
     "error": {
       "required": "This field is required.",
-      "invalid_host": "Enter a host name or IP address, not a URL."
+      "invalid_host": "Enter a host name or IP address, not a URL.",
+      "invalid_text": "Control characters are not allowed.",
+      "name_too_long": "Name must be 80 characters or fewer.",
+      "host_too_long": "Host must be 253 characters or fewer.",
+      "group_too_long": "Group must be 80 characters or fewer.",
+      "critical_must_exceed_warning": "Critical latency must be greater than warning latency.",
+      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay."
     },
     "abort": {
       "already_configured": "That host and TCP port are already being monitored.",
-      "reconfigure_successful": "Target configuration updated."
+      "reconfigure_successful": "Target configuration updated.",
+      "setup_incomplete": "Setup could not continue because the target details were not available."
     }
   },
   "options": {
@@ -69,7 +106,10 @@
       }
     },
     "error": {
-      "critical_must_exceed_warning": "Critical latency must be greater than warning latency."
+      "critical_must_exceed_warning": "Critical latency must be greater than warning latency.",
+      "invalid_text": "Control characters are not allowed.",
+      "group_too_long": "Group must be 80 characters or fewer.",
+      "probe_budget_too_large": "The timeout/retry combination could keep a probe cycle busy for more than 60 seconds. Reduce the timeout, retries, or retry delay."
     }
   },
   "entity": {
@@ -111,6 +151,27 @@
       },
       "quality": {
         "name": "Quality"
+      },
+      "p95_response_time": {
+        "name": "95th percentile response time"
+      },
+      "successful_probes": {
+        "name": "Successful probes"
+      },
+      "failed_probes": {
+        "name": "Failed probes"
+      },
+      "last_check": {
+        "name": "Last check"
+      },
+      "last_status_change": {
+        "name": "Last status change"
+      },
+      "current_outage_duration": {
+        "name": "Current outage duration"
+      },
+      "last_outage_duration": {
+        "name": "Last outage duration"
       }
     },
     "button": {
