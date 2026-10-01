@@ -8,7 +8,7 @@ from functools import partial
 from typing import Any
 
 import voluptuous as vol
-from homeassistant.config_entries import ConfigEntry, SOURCE_IMPORT
+from homeassistant.config_entries import SOURCE_IMPORT, ConfigEntry
 from homeassistant.const import CONF_HOST, CONF_NAME, CONF_PORT
 from homeassistant.core import (
     HomeAssistant,
@@ -110,7 +110,11 @@ async def _async_end_maintenance(hass: HomeAssistant, call: ServiceCall) -> None
     )
 
 
-def _portable_target(entry: ConfigEntry, index: int, id_to_ref: dict[str, str]) -> dict[str, Any]:
+def _portable_target(
+    entry: ConfigEntry,
+    index: int,
+    id_to_ref: dict[str, str],
+) -> dict[str, Any]:
     """Return a portable target payload with no Home Assistant config-entry IDs."""
     target_id = str(entry.data.get(CONF_TARGET_ID, entry.entry_id))
     dependency_target_id = str(
@@ -180,7 +184,11 @@ async def _async_import_config(
     """Import a portable HA Probulator configuration bundle."""
     raw_payload = call.data[ATTR_PAYLOAD]
     try:
-        bundle = json.loads(raw_payload) if isinstance(raw_payload, str) else raw_payload
+        bundle = (
+            json.loads(raw_payload)
+            if isinstance(raw_payload, str)
+            else raw_payload
+        )
     except json.JSONDecodeError as exc:
         raise ServiceValidationError("Import payload is not valid JSON") from exc
 
@@ -193,7 +201,9 @@ async def _async_import_config(
     if not isinstance(targets, list) or not targets:
         raise ServiceValidationError("Import bundle does not contain any targets")
     if len(targets) > 500:
-        raise ServiceValidationError("Import bundle exceeds the 500-target safety limit")
+        raise ServiceValidationError(
+            "Import bundle exceeds the 500-target safety limit"
+        )
 
     created: dict[str, ConfigEntry] = {}
     skipped: list[dict[str, str]] = []
@@ -292,7 +302,8 @@ async def _async_clone_target(
     entry = await _create_from_import(hass, payload)
     if entry is None:
         raise ServiceValidationError(
-            "Clone could not be created because the destination is invalid or already exists"
+            "Clone could not be created because the destination is invalid "
+            "or already exists"
         )
 
     return {
