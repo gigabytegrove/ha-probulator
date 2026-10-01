@@ -149,15 +149,13 @@ class ProbulatorRuntimeManager:
             if status not in {"maintenance", "disabled"}:
                 active += 1
             success_rate = data.get("success_rate")
-            if (
-                status not in {"maintenance", "disabled"}
-                and isinstance(success_rate, (int, float))
+            if status not in {"maintenance", "disabled"} and isinstance(
+                success_rate, (int, float)
             ):
                 success_rates.append(float(success_rate))
             response_time = data.get("response_time_ms")
-            if (
-                status not in {"maintenance", "disabled"}
-                and isinstance(response_time, (int, float))
+            if status not in {"maintenance", "disabled"} and isinstance(
+                response_time, (int, float)
             ):
                 response_times.append(float(response_time))
 
@@ -170,9 +168,7 @@ class ProbulatorRuntimeManager:
             + counts["unknown"]
         )
         availability = (
-            round(sum(success_rates) / len(success_rates), 3)
-            if success_rates
-            else None
+            round(sum(success_rates) / len(success_rates), 3) if success_rates else None
         )
         average_response = (
             round(sum(response_times) / len(response_times), 3)
