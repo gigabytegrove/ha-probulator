@@ -380,7 +380,7 @@ if (!existing.has("probulator-card")) {
     getEntitySuggestion: (hass, entityId) => {
       const stateObj = hass?.states?.[entityId];
       if (stateObj?.attributes?.probulator !== true || stateObj?.attributes?.probulator_kind !== "target") return null;
-      return { type: "custom:probulator-card", entity: entityId, mode: "normal" };
+      return { config: { type: "custom:probulator-card", entity: entityId, mode: "normal" } };
     },
   });
 }
