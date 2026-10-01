@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from functools import partial
 
 import voluptuous as vol
 from homeassistant.core import HomeAssistant, ServiceCall
@@ -101,14 +102,14 @@ def async_setup_services(hass: HomeAssistant) -> None:
         hass,
         DOMAIN,
         SERVICE_PROBE,
-        lambda call: _async_probe(hass, call),
+        partial(_async_probe, hass),
         schema=vol.Schema(TARGET_SCHEMA),
     )
     async_register_admin_service(
         hass,
         DOMAIN,
         SERVICE_SET_MONITORING,
-        lambda call: _async_set_monitoring(hass, call),
+        partial(_async_set_monitoring, hass),
         schema=vol.Schema(
             {
                 **TARGET_SCHEMA,
@@ -120,7 +121,7 @@ def async_setup_services(hass: HomeAssistant) -> None:
         hass,
         DOMAIN,
         SERVICE_START_MAINTENANCE,
-        lambda call: _async_start_maintenance(hass, call),
+        partial(_async_start_maintenance, hass),
         schema=vol.Schema(
             {
                 **TARGET_SCHEMA,
@@ -135,6 +136,6 @@ def async_setup_services(hass: HomeAssistant) -> None:
         hass,
         DOMAIN,
         SERVICE_END_MAINTENANCE,
-        lambda call: _async_end_maintenance(hass, call),
+        partial(_async_end_maintenance, hass),
         schema=vol.Schema(TARGET_SCHEMA),
     )
