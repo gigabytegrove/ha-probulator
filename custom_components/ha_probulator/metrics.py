@@ -2,10 +2,10 @@
 
 from __future__ import annotations
 
+import math
 from collections import deque
 from dataclasses import dataclass
 from datetime import datetime
-import math
 from typing import Any
 
 from .const import LATENCY_HISTORY_LIMIT
