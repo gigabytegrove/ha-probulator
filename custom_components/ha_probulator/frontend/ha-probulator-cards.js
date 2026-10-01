@@ -1,3 +1,5 @@
+const PROBULATOR_FRONTEND_VERSION = "1.2.0";
+
 const PROBULATOR_STYLE = `
   :host {
     --probulator-online-color: var(--success-color, #43a047);
@@ -68,6 +70,10 @@ const PROBULATOR_STYLE = `
   .manager-info { cursor:pointer; min-width:0; }
   .manager-info:focus-visible { outline:2px solid var(--primary-color); outline-offset:3px; border-radius:4px; }
   .manager-count { color:var(--secondary-text-color); font-size:.78rem; margin-top:10px; }
+  .version-warning { margin:12px 0; padding:10px 12px; border-radius:10px; background:color-mix(in srgb, var(--warning-color) 16%, transparent); color:var(--primary-text-color); font-size:.82rem; }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { scroll-behavior:auto !important; transition:none !important; animation:none !important; }
+  }
   .summary { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:10px; margin-top:14px; }
   .summary-box { padding:12px; border-radius:10px; background:color-mix(in srgb, var(--primary-text-color) 5%, transparent); }
   .summary-box .n { font-size:1.35rem; font-weight:700; }
@@ -125,6 +131,13 @@ function stateStatus(stateObj) {
   if (stateObj.state === "on") return "online";
   if (stateObj.state === "off") return "offline";
   return "probing";
+}
+
+function frontendVersionWarning(targets) {
+  const backend = targets.find((stateObj) => stateObj.attributes?.integration_version)
+    ?.attributes?.integration_version;
+  if (!backend || backend === PROBULATOR_FRONTEND_VERSION) return "";
+  return `<div class="version-warning" role="status">Frontend ${esc(PROBULATOR_FRONTEND_VERSION)} is loaded with backend ${esc(backend)}. Refresh the browser after the integration update.</div>`;
 }
 
 function statusLabel(status) {
@@ -813,6 +826,7 @@ class ProbulatorManagerCard extends HTMLElement {
               <div class="sub">Search, inspect, probe, suppress, or disable targets without leaving the dashboard.</div>
             </div>
           </div>
+          ${frontendVersionWarning(targets)}
           <div class="manager-toolbar">
             <input class="manager-input" type="search" aria-label="Search HA Probulator targets" placeholder="Search targets, addresses, groups, states…" value="${esc(this._search)}">
             ${groupControl}
