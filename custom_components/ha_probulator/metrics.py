@@ -98,9 +98,7 @@ class ProbeMetrics:
         self.total_probes = int(data.get("total_probes") or 0)
         self.successful_probes = int(data.get("successful_probes") or 0)
         self.failed_probes = int(data.get("failed_probes") or 0)
-        self.last_outage_duration_seconds = data.get(
-            "last_outage_duration_seconds"
-        )
+        self.last_outage_duration_seconds = data.get("last_outage_duration_seconds")
 
         for key in ("last_success", "last_failure"):
             raw = data.get(key)
