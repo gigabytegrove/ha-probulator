@@ -16,7 +16,10 @@ HA Probulator:
 - redacts monitored host/target values from shareable diagnostics;
 - exposes stable failure categories instead of raw operating-system exception text;
 - bounds configuration input and rejects probe settings that can exceed a 60-second theoretical probe cycle;
-- preserves asyncio cancellation so shutdown/reload operations cannot be trapped in retry handling.
+- preserves asyncio cancellation so shutdown/reload operations cannot be trapped in retry handling;
+- bounds concurrent probes with a shared semaphore and deterministically staggers startup probes;
+- registers monitoring/maintenance/probe runtime actions as administrator-only Home Assistant services;
+- keeps persistent runtime state in Home Assistant private storage rather than exposing it through external services.
 
 As with any network-monitoring integration, an administrator can intentionally configure connections to services reachable from the Home Assistant host. Treat Home Assistant administrative access as trusted.
 
