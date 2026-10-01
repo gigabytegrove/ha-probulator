@@ -48,6 +48,8 @@ class ProbulatorRuntimeManager:
         self.probe_semaphore = asyncio.Semaphore(DEFAULT_MAX_CONCURRENT_PROBES)
         self._states: dict[str, dict[str, Any]] = {}
         self._coordinators: dict[str, ProbulatorCoordinator] = {}
+        self._group_platforms: dict[str, dict[str, tuple[Any, Any]]] = {}
+        self._group_entities: dict[str, dict[str, Any]] = {}
 
     async def async_load(self) -> None:
         """Load persistent target runtime state."""
@@ -64,10 +66,153 @@ class ProbulatorRuntimeManager:
         """Register a live target coordinator."""
         self._coordinators[coordinator.target_id] = coordinator
         self._state(coordinator.target_id)
+        self._ensure_group_entities()
 
     def unregister(self, target_id: str) -> None:
         """Unregister a target coordinator while retaining persistent state."""
         self._coordinators.pop(target_id, None)
+        self.refresh_group_entities()
+
+    def register_group_platform(
+        self,
+        platform: str,
+        entry_id: str,
+        async_add_entities: Any,
+        factory: Any,
+    ) -> None:
+        """Register one config-entry platform as a host for group aggregate entities."""
+        platforms = self._group_platforms.setdefault(platform, {})
+        platforms[entry_id] = (async_add_entities, factory)
+        self._group_entities.setdefault(platform, {})
+        self._ensure_group_entities(platform)
+
+    def unregister_group_platform(self, platform: str, entry_id: str) -> None:
+        """Remove one aggregate platform host and re-home aggregates when needed."""
+        platforms = self._group_platforms.get(platform)
+        if not platforms:
+            return
+        was_owner = next(iter(platforms), None) == entry_id
+        platforms.pop(entry_id, None)
+        if not platforms:
+            self._group_entities.pop(platform, None)
+            return
+        if was_owner:
+            # Entities attached to the unloaded config-entry platform are removed by
+            # Home Assistant. Recreate them through the next live platform callback.
+            self._group_entities[platform] = {}
+            self._ensure_group_entities(platform)
+
+    def groups(self) -> list[str]:
+        """Return normalized display names for currently loaded non-empty groups."""
+        return sorted(
+            {
+                coordinator.group.strip()
+                for coordinator in self._coordinators.values()
+                if coordinator.group.strip()
+            },
+            key=str.casefold,
+        )
+
+    def group_snapshot(self, group: str) -> dict[str, Any]:
+        """Return aggregate health for one target group."""
+        wanted = group.strip().casefold()
+        members = [
+            coordinator
+            for coordinator in self._coordinators.values()
+            if coordinator.group.strip().casefold() == wanted
+        ]
+        counts = {
+            "online": 0,
+            "degraded": 0,
+            "unstable": 0,
+            "offline": 0,
+            "dependency_offline": 0,
+            "maintenance": 0,
+            "disabled": 0,
+            "probing": 0,
+            "unknown": 0,
+        }
+        success_rates: list[float] = []
+        response_times: list[float] = []
+        active = 0
+
+        for coordinator in members:
+            data = coordinator.data or {}
+            status = str(data.get("status", "unknown"))
+            counts[status if status in counts else "unknown"] += 1
+            if status not in {"maintenance", "disabled"}:
+                active += 1
+            success_rate = data.get("success_rate")
+            if (
+                status not in {"maintenance", "disabled"}
+                and isinstance(success_rate, (int, float))
+            ):
+                success_rates.append(float(success_rate))
+            response_time = data.get("response_time_ms")
+            if (
+                status not in {"maintenance", "disabled"}
+                and isinstance(response_time, (int, float))
+            ):
+                response_times.append(float(response_time))
+
+        unhealthy = (
+            counts["offline"]
+            + counts["dependency_offline"]
+            + counts["unstable"]
+            + counts["degraded"]
+            + counts["probing"]
+            + counts["unknown"]
+        )
+        availability = (
+            round(sum(success_rates) / len(success_rates), 3)
+            if success_rates
+            else None
+        )
+        average_response = (
+            round(sum(response_times) / len(response_times), 3)
+            if response_times
+            else None
+        )
+
+        return {
+            "group": group,
+            "total_targets": len(members),
+            "active_targets": active,
+            "healthy": active > 0 and unhealthy == 0,
+            "availability": availability,
+            "average_response_time_ms": average_response,
+            **counts,
+        }
+
+    def _ensure_group_entities(self, platform: str | None = None) -> None:
+        """Create aggregate entities for any newly observed groups."""
+        platforms = [platform] if platform else list(self._group_platforms)
+        for platform_name in platforms:
+            hosts = self._group_platforms.get(platform_name, {})
+            if not hosts:
+                continue
+            owner_id = next(iter(hosts))
+            async_add_entities, factory = hosts[owner_id]
+            entities = self._group_entities.setdefault(platform_name, {})
+            new_entities = []
+            for group in self.groups():
+                key = group.casefold()
+                if key in entities:
+                    continue
+                entity = factory(group)
+                entities[key] = entity
+                new_entities.append(entity)
+            if new_entities:
+                async_add_entities(new_entities)
+
+    def refresh_group_entities(self) -> None:
+        """Refresh all group aggregate entities and discover newly added groups."""
+        self._ensure_group_entities()
+        live_groups = {group.casefold() for group in self.groups()}
+        for entities in self._group_entities.values():
+            for key, entity in entities.items():
+                if key in live_groups:
+                    entity.async_write_ha_state()
 
     def _state(self, target_id: str) -> dict[str, Any]:
         return self._states.setdefault(
