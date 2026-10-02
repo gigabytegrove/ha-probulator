@@ -168,11 +168,23 @@ overview.hass = {
 if (overview.shadowRoot.innerHTML.includes(">HA Probulator<")) {
   throw new Error("legacy overview title was not suppressed");
 }
-if (overview.getGridOptions().rows !== "auto") {
-  throw new Error("overview card is not using natural grid height");
+const overviewGrid = overview.getGridOptions();
+if (
+  overviewGrid.rows !== "auto"
+  || overviewGrid.columns !== "full"
+  || overviewGrid.min_columns !== 6
+) {
+  throw new Error("overview card is not using responsive full-width grid sizing");
 }
-if (target.getGridOptions().rows !== "auto") {
-  throw new Error("target card is not using natural grid height");
+
+const targetGrid = target.getGridOptions();
+if (
+  targetGrid.rows !== "auto"
+  || targetGrid.columns !== 6
+  || targetGrid.min_columns !== 3
+  || targetGrid.max_columns !== 12
+) {
+  throw new Error("target card is not exposing a flexible grid width range");
 }
 
 const ManagerCard = registry.get("probulator-manager-card");
@@ -182,6 +194,27 @@ if (managerStub.show_bulk_actions !== true) {
 }
 const manager = new ManagerCard();
 manager.setConfig({ title: "Manager", show_actions: true, show_bulk_actions: true });
+const managerGrid = manager.getGridOptions();
+if (
+  managerGrid.rows !== "auto"
+  || managerGrid.columns !== "full"
+  || managerGrid.min_columns !== 6
+) {
+  throw new Error("manager card is not using responsive full-width grid sizing");
+}
+
+const SummaryCard = registry.get("probulator-summary-card");
+const summary = new SummaryCard();
+summary.setConfig({ title: "Summary" });
+const summaryGrid = summary.getGridOptions();
+if (
+  summaryGrid.rows !== "auto"
+  || summaryGrid.columns !== 12
+  || summaryGrid.min_columns !== 6
+  || summaryGrid.max_columns !== 12
+) {
+  throw new Error("summary card is not exposing a flexible grid width range");
+}
 
 let invalidModeRejected = false;
 try {
