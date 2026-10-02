@@ -243,8 +243,9 @@ Supported modes:
 - `minimal` — name/status and current response time.
 - `normal` — status plus current/average response time and success rate.
 - `extended` — the full target view, including host/port, group, min/p95/max response time, jitter, failure information, last check/status change, outage duration, timestamps, sanitized last-error category, and a recent latency sparkline.
+- `custom` — a row-by-row layout that you define.
 
-The visual editor can select the target, mode, icon/name overrides, individual metric visibility, sparkline visibility, and common theme overrides.
+The visual editor can select the target, mode, icon/name overrides, individual metric visibility, sparkline visibility, common theme overrides, and up to eight custom layout rows.
 
 Optional presentation overrides:
 
@@ -264,6 +265,128 @@ online_color: "#00c853"
 degraded_color: "#ffab00"
 offline_color: "#d50000"
 ```
+
+### Custom target-card layouts
+
+Custom mode lets the card be assembled line by line. Each line is a comma-separated list of fields:
+
+```yaml
+type: custom:probulator-card
+entity: binary_sensor.dns_1_reachable
+mode: custom
+
+line_1: icon, name, spacer, status
+line_2: target
+line_3: response:stack, success:stack
+line_4: thresholds:value
+line_5: checked_ago:value, spacer, service:value
+```
+
+That produces the same general information density as the older Network Probe-style card, but every line is under your control.
+
+Available fields include:
+
+```text
+icon
+status_dot
+name
+target
+host
+port
+group
+status
+underlying_status
+quality
+monitoring
+maintenance
+flapping
+response
+average
+min
+max
+p95
+jitter
+success
+samples
+failures
+successful_probes
+total_probes
+consecutive_failures
+consecutive_successes
+flap_transitions
+last_check
+checked_ago
+last_success
+last_failure
+status_change
+outage
+last_outage
+outage_count
+longest_outage
+mean_outage
+total_outage
+stable_since
+probe_interval
+thresholds
+timeout
+retries
+attempts
+probe_cycle
+queue_wait
+dependency
+maintenance_until
+error
+probe_type
+service
+spacer
+divider
+sparkline
+```
+
+Field presentation can be overridden per item:
+
+- `response:value` — value only.
+- `response:inline` — label and value on one line.
+- `response:stack` — label above the value.
+
+Without a suffix, the card chooses a sensible presentation based on the field type and the **Show labels** setting.
+
+Custom layout options also include:
+
+- **Hide fields with no value**.
+- Custom labels using `field=Label; field=Label`.
+- Card padding.
+- Row gap.
+- Field gap.
+- Existing card color/background/radius/font controls.
+
+For example:
+
+```yaml
+custom_labels: "response=Latency; success=Availability; checked_ago=Checked"
+custom_hide_empty: true
+card_padding: 12px
+row_gap: 8px
+field_gap: 12px
+```
+
+If Custom mode is selected without any rows, Probulator supplies a usable three-line starting layout rather than rendering an empty card.
+
+### Custom Overview rows
+
+The Overview card uses the same layout engine. Define up to four lines for every target row:
+
+```yaml
+type: custom:probulator-overview-card
+group: DNS
+sort: status
+
+item_line_1: name, spacer, status
+item_line_2: target
+item_line_3: response:value, success:value
+```
+
+Leave all `item_line_*` fields blank to retain the built-in compact Overview layout.
 
 ### Overview card
 
@@ -341,6 +464,9 @@ Probulator Dark:
   probulator-card-border-radius: "14px"
   probulator-gap: "12px"
   probulator-metric-font-size: "1.25rem"
+  probulator-card-padding: "16px"
+  probulator-row-gap: "10px"
+  probulator-field-gap: "10px"
 ```
 
 The matching CSS custom properties are:
@@ -354,6 +480,9 @@ The matching CSS custom properties are:
 --probulator-card-border-radius
 --probulator-gap
 --probulator-metric-font-size
+--probulator-card-padding
+--probulator-row-gap
+--probulator-field-gap
 ```
 
 Card-level color/background overrides take precedence over theme defaults where supplied.
@@ -463,7 +592,7 @@ Latency at or above the warning/critical thresholds also produces a `degraded` s
 
 ## Probe model
 
-HA Probulator 1.2 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
+HA Probulator 1.3 uses TCP connection probes. A successful TCP connection proves that Home Assistant can reach the configured service port; it does not assert that the application protocol behind that port is healthy.
 
 This is deliberate. TCP monitoring is small, local, predictable, and works with devices that do not answer ICMP echo requests.
 
