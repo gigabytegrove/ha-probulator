@@ -55,6 +55,8 @@ const PROBULATOR_STYLE = `
   .targets { display:grid; gap:10px; }
   .target-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--divider-color); cursor:pointer; }
   .target-row:first-child { border-top:0; }
+  .custom-target-row { display:block; }
+  .custom-target-row .custom-layout { width:100%; }
   .target-name { min-width:0; overflow-wrap:anywhere; }
   .pill { border-radius:999px; padding:3px 8px; font-size:.76rem; text-transform:capitalize; background:color-mix(in srgb, var(--secondary-text-color) 10%, transparent); }
   .pill.online { color:var(--probulator-online-color); }
@@ -87,6 +89,22 @@ const PROBULATOR_STYLE = `
   .summary-box .n { font-size:1.35rem; font-weight:700; }
   .summary-box .l { color:var(--secondary-text-color); font-size:.75rem; margin-top:2px; }
   .footer { color:var(--secondary-text-color); font-size:.78rem; margin-top:12px; }
+  .custom-layout { display:grid; gap:10px; min-width:0; }
+  .custom-line { display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; }
+  .custom-field { min-width:0; }
+  .custom-grow { flex:1 1 auto; }
+  .custom-spacer { flex:1 1 20px; min-width:8px; }
+  .custom-divider { width:100%; border-top:1px solid var(--divider-color); height:0; }
+  .custom-primary { font-weight:600; overflow-wrap:anywhere; }
+  .custom-secondary { color:var(--secondary-text-color); font-size:.82rem; overflow-wrap:anywhere; }
+  .custom-metric { display:flex; flex-direction:column; min-width:62px; }
+  .custom-metric-label { color:var(--secondary-text-color); font-size:.7rem; line-height:1.2; text-transform:uppercase; }
+  .custom-metric-value { font-weight:600; line-height:1.25; overflow-wrap:anywhere; }
+  .custom-inline { display:flex; align-items:baseline; gap:5px; min-width:0; }
+  .custom-inline .custom-metric-label { text-transform:none; }
+  .custom-icon { display:flex; align-items:center; justify-content:center; }
+  .custom-status { margin-left:0; }
+  .custom-warning { color:var(--warning-color); font-size:.76rem; overflow-wrap:anywhere; }
   @container (max-width: 440px) {
     .wrap { padding: 12px; }
     .header { align-items:flex-start; flex-wrap:wrap; }
@@ -269,6 +287,7 @@ class ProbulatorFormEditor extends HTMLElement {
     this.attachShadow({ mode: "open" });
     this._config = {};
     this._schema = [];
+    this._hint = "All fields are optional unless marked required. Changes preview immediately.";
   }
 
   set hass(hass) {
@@ -281,9 +300,10 @@ class ProbulatorFormEditor extends HTMLElement {
     this._render();
   }
 
-  configure(schema, labels) {
+  configure(schema, labels, hint = null) {
     this._schema = schema;
     this._labels = labels;
+    if (hint) this._hint = hint;
     this._render();
   }
 
@@ -298,7 +318,7 @@ class ProbulatorFormEditor extends HTMLElement {
         :host { display:block; padding:8px 0; }
         .hint { color:var(--secondary-text-color); font-size:.82rem; margin:0 0 12px; }
       </style>
-      <div class="hint">All fields are optional unless marked required. Changes preview immediately.</div>
+      <div class="hint">${esc(this._hint)}</div>
       <ha-form></ha-form>
     `;
     const form = this.shadowRoot.querySelector("ha-form");
@@ -323,6 +343,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       show_p95: false,
       show_jitter: false,
       show_sparkline: true,
+      custom_show_labels: true,
       ...config,
     });
   }
@@ -331,7 +352,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
     super();
     this.configure([
       { name: "entity", required: true, selector: { entity: { domain: ["binary_sensor"] } } },
-      { name: "mode", selector: { select: { options: ["minimal", "normal", "extended"], mode: "dropdown" } } },
+      { name: "mode", selector: { select: { options: ["minimal", "normal", "extended", "custom"], mode: "dropdown" } } },
       { name: "name", selector: { text: {} } },
       { name: "icon", selector: { icon: {} } },
       { name: "show_response", selector: { boolean: {} } },
@@ -340,6 +361,16 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       { name: "show_p95", selector: { boolean: {} } },
       { name: "show_jitter", selector: { boolean: {} } },
       { name: "show_sparkline", selector: { boolean: {} } },
+      { name: "line_1", selector: { text: {} } },
+      { name: "line_2", selector: { text: {} } },
+      { name: "line_3", selector: { text: {} } },
+      { name: "line_4", selector: { text: {} } },
+      { name: "line_5", selector: { text: {} } },
+      { name: "line_6", selector: { text: {} } },
+      { name: "line_7", selector: { text: {} } },
+      { name: "line_8", selector: { text: {} } },
+      { name: "custom_show_labels", selector: { boolean: {} } },
+      { name: "custom_labels", selector: { text: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
       { name: "offline_color", selector: { text: {} } },
@@ -357,13 +388,23 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       show_p95: "Show 95th percentile",
       show_jitter: "Show jitter",
       show_sparkline: "Show latency sparkline (Extended)",
+      line_1: "Custom line 1",
+      line_2: "Custom line 2",
+      line_3: "Custom line 3",
+      line_4: "Custom line 4",
+      line_5: "Custom line 5",
+      line_6: "Custom line 6",
+      line_7: "Custom line 7",
+      line_8: "Custom line 8",
+      custom_show_labels: "Show labels in Custom mode",
+      custom_labels: "Custom labels (field=Label; field=Label)",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
       offline_color: "Offline color (CSS value)",
       background: "Card background (CSS value)",
       border_radius: "Border radius (CSS value)",
       metric_font_size: "Metric font size (CSS value)",
-    });
+    }, "Custom mode fields: icon, name, target, host, port, group, status, quality, response, average, min, max, p95, jitter, success, samples, failures, consecutive_failures, last_check, last_success, last_failure, status_change, outage, last_outage, stable_since, probe_interval, dependency, maintenance_until, error, probe_type, spacer, divider, sparkline. Put comma-separated fields on each Custom line.");
   }
 }
 
@@ -381,6 +422,12 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
       { name: "group", selector: { text: {} } },
       { name: "sort", selector: { select: { options: ["status", "name"], mode: "dropdown" } } },
       { name: "entities", selector: { entity: { domain: ["binary_sensor"], multiple: true } } },
+      { name: "item_line_1", selector: { text: {} } },
+      { name: "item_line_2", selector: { text: {} } },
+      { name: "item_line_3", selector: { text: {} } },
+      { name: "item_line_4", selector: { text: {} } },
+      { name: "custom_show_labels", selector: { boolean: {} } },
+      { name: "custom_labels", selector: { text: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
       { name: "offline_color", selector: { text: {} } },
@@ -391,12 +438,18 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
       group: "Group filter",
       sort: "Sort order",
       entities: "Specific targets",
+      item_line_1: "Target row line 1",
+      item_line_2: "Target row line 2",
+      item_line_3: "Target row line 3",
+      item_line_4: "Target row line 4",
+      custom_show_labels: "Show labels in custom target rows",
+      custom_labels: "Custom labels (field=Label; field=Label)",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
       offline_color: "Offline color (CSS value)",
       background: "Card background (CSS value)",
       border_radius: "Border radius (CSS value)",
-    });
+    }, "Overview target rows use the same field keys as the Target card. Leave all Target row lines blank for the built-in compact layout, or define up to four custom lines.");
   }
 }
 
@@ -472,6 +525,212 @@ class ProbulatorManagerEditor extends ProbulatorFormEditor {
   }
 }
 
+
+const PROBULATOR_LAYOUT_FIELDS = new Set([
+  "icon",
+  "name",
+  "target",
+  "host",
+  "port",
+  "group",
+  "status",
+  "quality",
+  "response",
+  "average",
+  "min",
+  "max",
+  "p95",
+  "jitter",
+  "success",
+  "samples",
+  "failures",
+  "consecutive_failures",
+  "last_check",
+  "last_success",
+  "last_failure",
+  "status_change",
+  "outage",
+  "last_outage",
+  "stable_since",
+  "probe_interval",
+  "dependency",
+  "maintenance_until",
+  "error",
+  "probe_type",
+  "spacer",
+  "divider",
+  "sparkline",
+]);
+
+const PROBULATOR_DEFAULT_LABELS = {
+  target: "Target",
+  host: "Host",
+  port: "Port",
+  group: "Group",
+  status: "Status",
+  quality: "Quality",
+  response: "Response",
+  average: "Average",
+  min: "Minimum",
+  max: "Maximum",
+  p95: "95th percentile",
+  jitter: "Jitter",
+  success: "Success",
+  samples: "Samples",
+  failures: "Failures",
+  consecutive_failures: "Consecutive failures",
+  last_check: "Last check",
+  last_success: "Last success",
+  last_failure: "Last failure",
+  status_change: "Last status change",
+  outage: "Current outage",
+  last_outage: "Last outage",
+  stable_since: "Stable since",
+  probe_interval: "Probe interval",
+  dependency: "Dependency",
+  maintenance_until: "Maintenance until",
+  error: "Last error",
+  probe_type: "Probe",
+};
+
+function parseCustomLabels(value) {
+  const labels = {};
+  String(value || "").split(";").forEach((entry) => {
+    const split = entry.indexOf("=");
+    if (split <= 0) return;
+    const key = entry.slice(0, split).trim();
+    const label = entry.slice(split + 1).trim();
+    if (PROBULATOR_LAYOUT_FIELDS.has(key) && label) labels[key] = label;
+  });
+  return labels;
+}
+
+function parseLayoutTokens(value) {
+  return String(value || "")
+    .split(",")
+    .map((token) => token.trim().toLowerCase())
+    .filter(Boolean);
+}
+
+function layoutRows(config, prefix = "line", count = 8) {
+  const rows = [];
+  for (let index = 1; index <= count; index += 1) {
+    const tokens = parseLayoutTokens(config?.[`${prefix}_${index}`]);
+    if (tokens.length) rows.push(tokens);
+  }
+  return rows;
+}
+
+function secondsText(value) {
+  const n = Number(value);
+  if (!Number.isFinite(n)) return "—";
+  if (n < 60) return `${Math.round(n)} s`;
+  if (n < 3600) return `${Math.floor(n / 60)}m ${Math.round(n % 60)}s`;
+  const hours = Math.floor(n / 3600);
+  const minutes = Math.floor((n % 3600) / 60);
+  return `${hours}h ${minutes}m`;
+}
+
+function fieldValue(key, stateObj, config = {}) {
+  const a = stateObj?.attributes || {};
+  const status = stateStatus(stateObj);
+  const name = config.name || a.target_name || a.friendly_name || stateObj?.entity_id || "—";
+  const hostPort = a.target || (a.host ? `${a.host}${a.port ? `:${a.port}` : ""}` : "—");
+
+  switch (key) {
+    case "name": return name;
+    case "target": return hostPort;
+    case "host": return a.host || "—";
+    case "port": return a.port ?? "—";
+    case "group": return a.group || "—";
+    case "status": return statusLabel(status);
+    case "quality": return statusLabel(a.quality);
+    case "response": return fmtMs(a.response_time_ms);
+    case "average": return fmtMs(a.average_response_time_ms);
+    case "min": return fmtMs(a.min_response_time_ms);
+    case "max": return fmtMs(a.max_response_time_ms);
+    case "p95": return fmtMs(a.p95_response_time_ms);
+    case "jitter": return fmtMs(a.jitter_ms);
+    case "success": return fmtPct(a.success_rate);
+    case "samples": return a.window_samples ?? "—";
+    case "failures": return a.failed_probes ?? "—";
+    case "consecutive_failures": return a.consecutive_failures ?? 0;
+    case "last_check": return fmtTime(a.last_check);
+    case "last_success": return fmtTime(a.last_success);
+    case "last_failure": return fmtTime(a.last_failure);
+    case "status_change": return fmtTime(a.last_status_change);
+    case "outage": return secondsText(a.current_outage_duration_seconds);
+    case "last_outage": return secondsText(a.last_outage_duration_seconds);
+    case "stable_since": return fmtTime(a.stable_since);
+    case "probe_interval": return a.current_scan_interval != null
+      ? `${a.current_scan_interval} s`
+      : a.scan_interval != null ? `${a.scan_interval} s` : "—";
+    case "dependency": return a.dependency_name
+      ? `${a.dependency_name} · ${statusLabel(a.dependency_status)}`
+      : "—";
+    case "maintenance_until": return fmtTime(a.maintenance_until);
+    case "error": return a.last_error || "—";
+    case "probe_type": return "TCP";
+    default: return "—";
+  }
+}
+
+function renderLayoutField(key, stateObj, config, labels, compact = false) {
+  const a = stateObj?.attributes || {};
+  const status = stateStatus(stateObj);
+  const label = labels[key] || PROBULATOR_DEFAULT_LABELS[key] || key;
+
+  if (key === "spacer") return '<span class="custom-spacer" aria-hidden="true"></span>';
+  if (key === "divider") return '<span class="custom-divider" aria-hidden="true"></span>';
+  if (key === "sparkline") return sparkline(a.latency_history);
+  if (key === "icon") {
+    const icon = config.icon || a.icon || "mdi:lan-connect";
+    return `<span class="custom-field custom-icon"><ha-icon icon="${esc(icon)}"></ha-icon></span>`;
+  }
+  if (key === "status") {
+    return `<span class="custom-field custom-status pill ${status}">${esc(statusLabel(status))}</span>`;
+  }
+
+  const value = fieldValue(key, stateObj, config);
+  if (key === "name") {
+    return `<span class="custom-field custom-grow custom-primary">${esc(value)}</span>`;
+  }
+  if (["target", "host", "group", "dependency", "error"].includes(key)) {
+    if (config.custom_show_labels === true && !compact) {
+      return `<span class="custom-field custom-grow custom-inline"><span class="custom-metric-label">${esc(label)}</span><span class="custom-secondary">${esc(value)}</span></span>`;
+    }
+    return `<span class="custom-field custom-grow custom-secondary">${esc(value)}</span>`;
+  }
+
+  if (config.custom_show_labels === false || compact) {
+    return `<span class="custom-field custom-metric-value">${esc(value)}</span>`;
+  }
+  return `<span class="custom-field custom-metric"><span class="custom-metric-label">${esc(label)}</span><span class="custom-metric-value">${esc(value)}</span></span>`;
+}
+
+function renderCustomLayout(stateObj, config, prefix = "line", count = 8, compact = false) {
+  const rows = layoutRows(config, prefix, count);
+  const labels = parseCustomLabels(config.custom_labels);
+  const unknown = new Set();
+
+  const html = rows.map((row) => {
+    const fields = row.map((token) => {
+      if (!PROBULATOR_LAYOUT_FIELDS.has(token)) {
+        unknown.add(token);
+        return "";
+      }
+      return renderLayoutField(token, stateObj, config, labels, compact);
+    }).join("");
+    return fields ? `<div class="custom-line">${fields}</div>` : "";
+  }).join("");
+
+  const warning = unknown.size
+    ? `<div class="custom-warning">Unknown layout field${unknown.size === 1 ? "" : "s"}: ${esc([...unknown].join(", "))}</div>`
+    : "";
+
+  return `<div class="custom-layout">${html}${warning}</div>`;
+}
+
 function sparkline(history) {
   const points = Array.isArray(history)
     ? history.map((item) => Number(item?.latency_ms)).filter(Number.isFinite)
@@ -505,6 +764,7 @@ class ProbulatorCard extends HTMLElement {
       show_p95: false,
       show_jitter: false,
       show_sparkline: true,
+      custom_show_labels: true,
     };
   }
 
@@ -522,10 +782,11 @@ class ProbulatorCard extends HTMLElement {
       show_p95: false,
       show_jitter: false,
       show_sparkline: true,
+      custom_show_labels: true,
       ...config,
     };
-    if (!["minimal", "normal", "extended"].includes(this._config.mode)) {
-      throw new Error("mode must be minimal, normal, or extended");
+    if (!["minimal", "normal", "extended", "custom"].includes(this._config.mode)) {
+      throw new Error("mode must be minimal, normal, extended, or custom");
     }
     applyInlineTheme(this, this._config);
     this._render();
@@ -537,6 +798,9 @@ class ProbulatorCard extends HTMLElement {
   }
 
   getCardSize() {
+    if (this._config?.mode === "custom") {
+      return Math.max(1, layoutRows(this._config, "line", 8).length);
+    }
     return this._config?.mode === "extended" ? 5 : this._config?.mode === "minimal" ? 1 : 3;
   }
 
@@ -564,7 +828,16 @@ class ProbulatorCard extends HTMLElement {
     const icon = this._config.icon || a.icon || "mdi:lan-connect";
     const hostPort = a.target || (a.host ? `${a.host}${a.port ? `:${a.port}` : ""}` : "");
 
-    if (mode === "minimal") {
+    if (mode === "custom") {
+      const custom = renderCustomLayout(stateObj, this._config, "line", 8, false);
+      this.shadowRoot.innerHTML = `
+        <style>${PROBULATOR_STYLE}</style>
+        <ha-card>
+          <div class="wrap" role="button" tabindex="0">
+            ${custom}
+          </div>
+        </ha-card>`;
+    } else if (mode === "minimal") {
       this.shadowRoot.innerHTML = `
         <style>${PROBULATOR_STYLE}</style>
         <ha-card>
@@ -682,6 +955,13 @@ class ProbulatorOverviewCard extends HTMLElement {
       const status = stateStatus(stateObj);
       const name = a.target_name || a.friendly_name || stateObj.entity_id;
       const sub = [a.target || (a.host && `${a.host}${a.port ? `:${a.port}` : ""}`), a.group].filter(Boolean).join(" · ");
+      const hasCustomLayout = layoutRows(this._config, "item_line", 4).length > 0;
+      if (hasCustomLayout) {
+        return `
+          <div class="target-row custom-target-row" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
+            ${renderCustomLayout(stateObj, this._config, "item_line", 4, true)}
+          </div>`;
+      }
       return `
         <div class="target-row" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
           <div class="grow"><div class="target-name">${esc(name)}</div><div class="sub">${esc(sub)}</div></div>
