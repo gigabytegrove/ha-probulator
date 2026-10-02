@@ -15,17 +15,22 @@ const PROBULATOR_STYLE = `
     --probulator-gap: 12px;
     --probulator-metric-font-size: 1.25rem;
     display: block;
+    min-width: 0;
+    container-type: inline-size;
   }
   ha-card {
     overflow: hidden;
+    min-width: 0;
+    width: 100%;
+    box-sizing: border-box;
     background: var(--probulator-card-background);
     border-radius: var(--probulator-card-border-radius);
   }
-  .wrap { padding: 16px; }
+  .wrap { padding: 16px; min-width:0; box-sizing:border-box; }
   .header { display:flex; align-items:center; gap:10px; min-width:0; }
   .grow { flex:1; min-width:0; }
-  .name { font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .sub { color:var(--secondary-text-color); font-size:.82rem; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .name { font-weight:600; min-width:0; overflow-wrap:anywhere; }
+  .sub { color:var(--secondary-text-color); font-size:.82rem; min-width:0; overflow-wrap:anywhere; }
   .status { display:flex; align-items:center; gap:7px; font-size:.86rem; text-transform:capitalize; white-space:nowrap; }
   .dot { width:10px; height:10px; border-radius:50%; background:var(--probulator-unknown-color); box-shadow:0 0 0 3px color-mix(in srgb, var(--probulator-unknown-color) 18%, transparent); }
   .online .dot { background:var(--probulator-online-color); box-shadow:0 0 0 3px color-mix(in srgb, var(--probulator-online-color) 18%, transparent); }
@@ -36,11 +41,11 @@ const PROBULATOR_STYLE = `
   .disabled .dot { background:var(--probulator-disabled-color); box-shadow:0 0 0 3px color-mix(in srgb, var(--probulator-disabled-color) 18%, transparent); }
   .metric-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:var(--probulator-gap); margin-top:14px; }
   .metric { min-width:0; }
-  .metric .value { font-size:var(--probulator-metric-font-size); font-weight:600; line-height:1.2; overflow:hidden; text-overflow:ellipsis; }
+  .metric .value { font-size:var(--probulator-metric-font-size); font-weight:600; line-height:1.2; min-width:0; overflow-wrap:anywhere; }
   .metric .label { margin-top:2px; color:var(--secondary-text-color); font-size:.75rem; }
   .details { display:grid; grid-template-columns:max-content 1fr; column-gap:12px; row-gap:7px; margin-top:16px; font-size:.84rem; }
   .details .label { color:var(--secondary-text-color); }
-  .details .value { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .details .value { min-width:0; overflow-wrap:anywhere; }
   .minimal { padding:12px 14px; }
   .minimal .latency { margin-left:auto; font-weight:600; }
   .spark { height:44px; margin-top:14px; width:100%; }
@@ -50,7 +55,7 @@ const PROBULATOR_STYLE = `
   .targets { display:grid; gap:10px; }
   .target-row { display:grid; grid-template-columns:minmax(0,1fr) auto auto; gap:12px; align-items:center; padding:10px 0; border-top:1px solid var(--divider-color); cursor:pointer; }
   .target-row:first-child { border-top:0; }
-  .target-name { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .target-name { min-width:0; overflow-wrap:anywhere; }
   .pill { border-radius:999px; padding:3px 8px; font-size:.76rem; text-transform:capitalize; background:color-mix(in srgb, var(--secondary-text-color) 10%, transparent); }
   .pill.online { color:var(--probulator-online-color); }
   .pill.degraded { color:var(--probulator-degraded-color); }
@@ -82,13 +87,56 @@ const PROBULATOR_STYLE = `
   .summary-box .n { font-size:1.35rem; font-weight:700; }
   .summary-box .l { color:var(--secondary-text-color); font-size:.75rem; margin-top:2px; }
   .footer { color:var(--secondary-text-color); font-size:.78rem; margin-top:12px; }
-  @media (max-width: 520px) {
-    .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  @container (max-width: 440px) {
+    .wrap { padding: 12px; }
+    .header { align-items:flex-start; flex-wrap:wrap; }
+    .header .status { margin-left:auto; }
+    .sub { white-space:normal; line-height:1.3; }
+    .metric-grid { grid-template-columns:repeat(2,minmax(0,1fr)); gap:10px; }
     .summary { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .target-row {
+      grid-template-columns:minmax(0,1fr) auto;
+      grid-template-areas:
+        "info status"
+        "latency latency";
+      row-gap:6px;
+      column-gap:10px;
+      align-items:start;
+    }
+    .target-row .grow { grid-area:info; }
+    .target-latency { grid-area:latency; justify-self:start; }
+    .target-status { grid-area:status; justify-self:end; }
+    .details { grid-template-columns:1fr; row-gap:3px; }
+    .details .label { margin-top:7px; font-size:.76rem; }
     .manager-toolbar { grid-template-columns:1fr; }
-    .manager-row { grid-template-columns:auto minmax(0,1fr) auto; }
-    .manager-metrics { display:none; }
-    .manager-actions { grid-column:2 / -1; justify-content:flex-start; }
+    .manager-row {
+      grid-template-columns:auto minmax(0,1fr) auto;
+      grid-template-areas:
+        "check info status"
+        ". metrics metrics"
+        ". actions actions";
+      align-items:start;
+    }
+    .manager-check { grid-area:check; }
+    .manager-info { grid-area:info; }
+    .manager-metrics { grid-area:metrics; display:block; }
+    .manager-row > .pill { grid-area:status; justify-self:end; }
+    .manager-actions { grid-area:actions; justify-content:flex-start; }
+  }
+  @container (max-width: 280px) {
+    .metric-grid { grid-template-columns:1fr; }
+    .summary { grid-template-columns:1fr; }
+    .target-row {
+      grid-template-columns:1fr;
+      grid-template-areas:
+        "info"
+        "latency"
+        "status";
+    }
+    .target-status { justify-self:start; }
+    .header .status { margin-left:0; width:100%; }
+    .minimal { flex-wrap:wrap; }
+    .minimal .latency { margin-left:0; width:100%; }
   }
 `;
 
@@ -493,7 +541,12 @@ class ProbulatorCard extends HTMLElement {
   }
 
   getGridOptions() {
-    return { columns: 6, rows: "auto" };
+    return {
+      columns: 6,
+      min_columns: 3,
+      max_columns: 12,
+      rows: "auto",
+    };
   }
 
   _render() {
@@ -613,7 +666,13 @@ class ProbulatorOverviewCard extends HTMLElement {
     const count = probulatorTargets(this._hass, this._config).length;
     return Math.max(1, count + (this._config?.title ? 1 : 0));
   }
-  getGridOptions() { return { columns: 12, rows: "auto" }; }
+  getGridOptions() {
+    return {
+      columns: "full",
+      min_columns: 6,
+      rows: "auto",
+    };
+  }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
@@ -626,8 +685,8 @@ class ProbulatorOverviewCard extends HTMLElement {
       return `
         <div class="target-row" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
           <div class="grow"><div class="target-name">${esc(name)}</div><div class="sub">${esc(sub)}</div></div>
-          <div>${fmtMs(a.response_time_ms)}</div>
-          <div class="pill ${status}">${esc(statusLabel(status))}</div>
+          <div class="target-latency">${fmtMs(a.response_time_ms)}</div>
+          <div class="pill target-status ${status}">${esc(statusLabel(status))}</div>
         </div>`;
     }).join("");
 
@@ -679,7 +738,14 @@ class ProbulatorSummaryCard extends HTMLElement {
   }
 
   getCardSize() { return 3; }
-  getGridOptions() { return { columns: 12, rows: "auto" }; }
+  getGridOptions() {
+    return {
+      columns: 12,
+      min_columns: 6,
+      max_columns: 12,
+      rows: "auto",
+    };
+  }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
@@ -761,7 +827,13 @@ class ProbulatorManagerCard extends HTMLElement {
   }
 
   getCardSize() { return 6; }
-  getGridOptions() { return { columns: 12, rows: "auto" }; }
+  getGridOptions() {
+    return {
+      columns: "full",
+      min_columns: 6,
+      rows: "auto",
+    };
+  }
 
   _applyFilter() {
     const search = this._search.trim().toLowerCase();
