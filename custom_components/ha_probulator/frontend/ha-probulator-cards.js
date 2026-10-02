@@ -424,7 +424,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       background: "Card background (CSS value)",
       border_radius: "Border radius (CSS value)",
       metric_font_size: "Metric font size (CSS value)",
-    }, "Custom mode fields: icon, name, target, host, port, group, status, quality, response, average, min, max, p95, jitter, success, samples, failures, consecutive_failures, last_check, last_success, last_failure, status_change, outage, last_outage, stable_since, probe_interval, dependency, maintenance_until, error, probe_type, spacer, divider, sparkline. Put comma-separated fields on each Custom line. Add :value, :inline, or :stack to a field to override its presentation, for example response:value or last_check:inline.");
+    }, "Custom mode fields: icon, status_dot, name, target, host, port, group, status, underlying_status, quality, monitoring, maintenance, flapping, response, average, min, max, p95, jitter, success, samples, failures, successful_probes, total_probes, consecutive_failures, consecutive_successes, flap_transitions, last_check, checked_ago, last_success, last_failure, status_change, outage, last_outage, outage_count, longest_outage, mean_outage, total_outage, stable_since, probe_interval, thresholds, timeout, retries, attempts, probe_cycle, queue_wait, dependency, maintenance_until, error, probe_type, service, spacer, divider, sparkline. Put comma-separated fields on each Custom line. Add :value, :inline, or :stack to a field to override its presentation, for example response:value or last_check:inline.");
   }
 }
 
@@ -556,13 +556,18 @@ class ProbulatorManagerEditor extends ProbulatorFormEditor {
 
 const PROBULATOR_LAYOUT_FIELDS = new Set([
   "icon",
+  "status_dot",
   "name",
   "target",
   "host",
   "port",
   "group",
   "status",
+  "underlying_status",
   "quality",
+  "monitoring",
+  "maintenance",
+  "flapping",
   "response",
   "average",
   "min",
@@ -572,19 +577,35 @@ const PROBULATOR_LAYOUT_FIELDS = new Set([
   "success",
   "samples",
   "failures",
+  "successful_probes",
+  "total_probes",
   "consecutive_failures",
+  "consecutive_successes",
+  "flap_transitions",
   "last_check",
+  "checked_ago",
   "last_success",
   "last_failure",
   "status_change",
   "outage",
   "last_outage",
+  "outage_count",
+  "longest_outage",
+  "mean_outage",
+  "total_outage",
   "stable_since",
   "probe_interval",
+  "thresholds",
+  "timeout",
+  "retries",
+  "attempts",
+  "probe_cycle",
+  "queue_wait",
   "dependency",
   "maintenance_until",
   "error",
   "probe_type",
+  "service",
   "spacer",
   "divider",
   "sparkline",
@@ -596,7 +617,11 @@ const PROBULATOR_DEFAULT_LABELS = {
   port: "Port",
   group: "Group",
   status: "Status",
+  underlying_status: "Underlying",
   quality: "Quality",
+  monitoring: "Monitoring",
+  maintenance: "Maintenance",
+  flapping: "Flapping",
   response: "Response",
   average: "Average",
   min: "Minimum",
@@ -605,20 +630,36 @@ const PROBULATOR_DEFAULT_LABELS = {
   jitter: "Jitter",
   success: "Success",
   samples: "Samples",
-  failures: "Failures",
+  failures: "Failed probes",
+  successful_probes: "Successful probes",
+  total_probes: "Total probes",
   consecutive_failures: "Consecutive failures",
+  consecutive_successes: "Consecutive successes",
+  flap_transitions: "Flap transitions",
   last_check: "Last check",
+  checked_ago: "Checked",
   last_success: "Last success",
   last_failure: "Last failure",
   status_change: "Last status change",
   outage: "Current outage",
   last_outage: "Last outage",
+  outage_count: "Outages",
+  longest_outage: "Longest outage",
+  mean_outage: "Mean outage",
+  total_outage: "Total outage",
   stable_since: "Stable since",
   probe_interval: "Probe interval",
+  thresholds: "Thresholds",
+  timeout: "Timeout",
+  retries: "Retries",
+  attempts: "Attempts",
+  probe_cycle: "Probe cycle",
+  queue_wait: "Queue wait",
   dependency: "Dependency",
   maintenance_until: "Maintenance until",
   error: "Last error",
   probe_type: "Probe",
+  service: "Service",
 };
 
 function parseCustomLabels(value) {
@@ -666,6 +707,20 @@ function secondsText(value) {
   return `${hours}h ${minutes}m`;
 }
 
+function relativeTime(value) {
+  if (!value) return "—";
+  const timestamp = new Date(value).getTime();
+  if (!Number.isFinite(timestamp)) return "—";
+  const seconds = Math.max(0, Math.round((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return `${seconds} second${seconds === 1 ? "" : "s"} ago`;
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes === 1 ? "" : "s"} ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours === 1 ? "" : "s"} ago`;
+  const days = Math.floor(hours / 24);
+  return `${days} day${days === 1 ? "" : "s"} ago`;
+}
+
 function fieldValue(key, stateObj, config = {}) {
   const a = stateObj?.attributes || {};
   const status = stateStatus(stateObj);
@@ -679,7 +734,11 @@ function fieldValue(key, stateObj, config = {}) {
     case "port": return a.port ?? "—";
     case "group": return a.group || "—";
     case "status": return statusLabel(status);
+    case "underlying_status": return statusLabel(a.underlying_status || status);
     case "quality": return statusLabel(a.quality);
+    case "monitoring": return a.monitoring_enabled === false ? "Disabled" : "Enabled";
+    case "maintenance": return a.maintenance === true ? "On" : "Off";
+    case "flapping": return a.flapping === true ? "Yes" : "No";
     case "response": return fmtMs(a.response_time_ms);
     case "average": return fmtMs(a.average_response_time_ms);
     case "min": return fmtMs(a.min_response_time_ms);
@@ -689,23 +748,45 @@ function fieldValue(key, stateObj, config = {}) {
     case "success": return fmtPct(a.success_rate);
     case "samples": return a.window_samples ?? "—";
     case "failures": return a.failed_probes ?? "—";
+    case "successful_probes": return a.successful_probes ?? "—";
+    case "total_probes": return a.total_probes ?? "—";
     case "consecutive_failures": return a.consecutive_failures ?? 0;
+    case "consecutive_successes": return a.consecutive_successes ?? 0;
+    case "flap_transitions": return a.flap_transitions ?? 0;
     case "last_check": return fmtTime(a.last_check);
+    case "checked_ago": return relativeTime(a.last_check);
     case "last_success": return fmtTime(a.last_success);
     case "last_failure": return fmtTime(a.last_failure);
     case "status_change": return fmtTime(a.last_status_change);
     case "outage": return secondsText(a.current_outage_duration_seconds);
     case "last_outage": return secondsText(a.last_outage_duration_seconds);
+    case "outage_count": return a.outage_count ?? 0;
+    case "longest_outage": return secondsText(a.longest_outage_duration_seconds);
+    case "mean_outage": return secondsText(a.mean_outage_duration_seconds);
+    case "total_outage": return secondsText(a.total_outage_duration_seconds);
     case "stable_since": return fmtTime(a.stable_since);
     case "probe_interval": return a.current_scan_interval != null
       ? `${a.current_scan_interval} s`
       : a.scan_interval != null ? `${a.scan_interval} s` : "—";
+    case "thresholds": {
+      const warning = Number(a.warning_latency_ms);
+      const critical = Number(a.critical_latency_ms);
+      return Number.isFinite(warning) && Number.isFinite(critical)
+        ? `W ${warning} · C ${critical} ms`
+        : "—";
+    }
+    case "timeout": return a.timeout != null ? `${a.timeout} s` : "—";
+    case "retries": return a.retries ?? "—";
+    case "attempts": return a.attempts ?? "—";
+    case "probe_cycle": return fmtMs(a.probe_cycle_ms);
+    case "queue_wait": return fmtMs(a.probe_queue_wait_ms);
     case "dependency": return a.dependency_name
       ? `${a.dependency_name} · ${statusLabel(a.dependency_status)}`
       : "—";
     case "maintenance_until": return fmtTime(a.maintenance_until);
     case "error": return a.last_error || "—";
     case "probe_type": return "TCP";
+    case "service": return "TCP Service";
     default: return "—";
   }
 }
@@ -722,6 +803,9 @@ function renderLayoutField(token, stateObj, config, labels, compact = false) {
   if (key === "icon") {
     const icon = config.icon || a.icon || "mdi:lan-connect";
     return `<span class="custom-field custom-icon"><ha-icon icon="${esc(icon)}"></ha-icon></span>`;
+  }
+  if (key === "status_dot") {
+    return `<span class="custom-field ${status}" aria-label="${esc(statusLabel(status))}"><span class="dot"></span></span>`;
   }
 
   const value = fieldValue(key, stateObj, config);
