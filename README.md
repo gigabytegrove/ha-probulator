@@ -220,6 +220,14 @@ stat_types:
 
 ## Custom cards
 
+### Responsive Sections sizing
+
+HA Probulator cards understand Home Assistant's current Sections grid sizing contract. Target cards default to a two-column-friendly width but expose a 3–12 column resize range; Summary cards expose 6–12 columns; Overview and Manager default to a full Section row.
+
+The card internals use CSS container queries, so layout is based on the **actual width Home Assistant gives the card**, not the browser width. Names, target addresses, groups, metrics, status pills, and Extended details reflow instead of being clipped on narrow cards.
+
+Home Assistant Sections itself is row-based rather than masonry. A short card placed beside a much taller card will keep the next grid row below the taller card. For that reason Overview and Manager intentionally default to full width; you can still resize them manually if you prefer a mixed-height row.
+
 The dashboard card bundle is shipped inside the integration and registered automatically when Home Assistant loads HA Probulator. No separate card repository is required. All four cards now include visual Home Assistant card editors, so their common settings can be configured from the dashboard UI instead of requiring YAML.
 
 ### Target card
