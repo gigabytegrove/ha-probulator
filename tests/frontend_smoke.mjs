@@ -142,6 +142,69 @@ if (!target.shadowRoot.innerHTML.includes("&lt;img")) {
 }
 
 
+
+const customTarget = new TargetCard();
+customTarget.setConfig({
+  entity: "binary_sensor.example",
+  mode: "custom",
+  line_1: "icon, name, spacer, status",
+  line_2: "target",
+  line_3: "response:stack, success:value, jitter:inline",
+  line_4: "missing_field, divider",
+  custom_show_labels: true,
+  custom_hide_empty: true,
+  custom_labels: 'response=<img src=x onerror="alert(1)">; jitter=Variation',
+});
+customTarget.hass = {
+  states: {
+    "binary_sensor.example": {
+      entity_id: "binary_sensor.example",
+      state: "on",
+      attributes: {
+        probulator: true,
+        probulator_kind: "target",
+        target_name: "DNS 1",
+        target: "192.168.0.2:53",
+        status: "online",
+        response_time_ms: 1.2,
+        success_rate: 100,
+        jitter_ms: 0.4,
+      },
+    },
+  },
+};
+const customHtml = customTarget.shadowRoot.innerHTML;
+for (const expected of ["DNS 1", "192.168.0.2:53", "1.2 ms", "100.00%", "Variation"]) {
+  if (!customHtml.includes(expected)) {
+    throw new Error(`custom target layout did not render expected field: ${expected}`);
+  }
+}
+if (!customHtml.includes("Unknown layout field: missing_field")) {
+  throw new Error("custom target layout did not report an unknown field");
+}
+if (customHtml.includes('<img src=x onerror="alert(1)">')) {
+  throw new Error("custom field label rendered unescaped HTML");
+}
+if (!customHtml.includes("&lt;img")) {
+  throw new Error("custom field label was not visibly escaped");
+}
+const line1 = customHtml.indexOf("DNS 1");
+const line2 = customHtml.indexOf("192.168.0.2:53");
+const line3 = customHtml.indexOf("1.2 ms");
+if (!(line1 >= 0 && line2 > line1 && line3 > line2)) {
+  throw new Error("custom target rows did not preserve configured line order");
+}
+
+const customDefaults = new TargetCard();
+customDefaults.setConfig({ entity: "binary_sensor.example", mode: "custom" });
+customDefaults.hass = customTarget._hass;
+if (
+  !customDefaults.shadowRoot.innerHTML.includes("DNS 1")
+  || !customDefaults.shadowRoot.innerHTML.includes("192.168.0.2:53")
+) {
+  throw new Error("custom mode did not populate sensible default rows");
+}
+
 const OverviewCard = registry.get("probulator-overview-card");
 const overviewStub = OverviewCard.getStubConfig();
 if ("title" in overviewStub) {
@@ -167,6 +230,24 @@ overview.hass = {
 };
 if (overview.shadowRoot.innerHTML.includes(">HA Probulator<")) {
   throw new Error("legacy overview title was not suppressed");
+}
+
+const customOverview = new OverviewCard();
+customOverview.setConfig({
+  sort: "status",
+  item_line_1: "name, spacer, status",
+  item_line_2: "target",
+  item_line_3: "response:value, success:value",
+  custom_show_labels: false,
+});
+customOverview.hass = overview._hass;
+const customOverviewHtml = customOverview.shadowRoot.innerHTML;
+if (
+  !customOverviewHtml.includes("DNS 1")
+  || !customOverviewHtml.includes("192.168.0.2:53")
+  || !customOverviewHtml.includes("1.7 ms")
+) {
+  throw new Error("overview custom target rows did not render selected fields");
 }
 const overviewGrid = overview.getGridOptions();
 if (
