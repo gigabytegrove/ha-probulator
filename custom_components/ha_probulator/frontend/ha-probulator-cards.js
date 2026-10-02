@@ -321,7 +321,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
 
 class ProbulatorOverviewEditor extends ProbulatorFormEditor {
   setConfig(config) {
-    super.setConfig({ title: "HA Probulator", sort: "status", ...config });
+    super.setConfig({ sort: "status", ...config });
   }
 
   constructor() {
@@ -491,7 +491,7 @@ class ProbulatorCard extends HTMLElement {
   }
 
   getGridOptions() {
-    return { columns: 6, rows: this._config?.mode === "extended" ? 5 : this._config?.mode === "minimal" ? 1 : 3 };
+    return { columns: 6, rows: "auto" };
   }
 
   _render() {
@@ -587,7 +587,7 @@ class ProbulatorOverviewCard extends HTMLElement {
   }
 
   static getStubConfig() {
-    return { title: "HA Probulator", sort: "status" };
+    return { sort: "status" };
   }
 
   static async getConfigElement() {
@@ -595,7 +595,7 @@ class ProbulatorOverviewCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { title: "HA Probulator", sort: "status", ...config };
+    this._config = { sort: "status", ...config };
     applyInlineTheme(this, this._config);
     this._render();
   }
@@ -605,8 +605,11 @@ class ProbulatorOverviewCard extends HTMLElement {
     this._render();
   }
 
-  getCardSize() { return 4; }
-  getGridOptions() { return { columns: 12, rows: 4 }; }
+  getCardSize() {
+    const count = probulatorTargets(this._hass, this._config).length;
+    return Math.max(1, count + (this._config?.title ? 1 : 0));
+  }
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
@@ -628,7 +631,7 @@ class ProbulatorOverviewCard extends HTMLElement {
       <style>${PROBULATOR_STYLE}</style>
       <ha-card>
         <div class="wrap">
-          <div class="header"><div class="grow"><div class="name">${esc(this._config.title)}</div>${this._config.group ? `<div class="sub">Group: ${esc(this._config.group)}</div>` : ""}</div></div>
+          ${this._config.title ? `<div class="header"><div class="grow"><div class="name">${esc(this._config.title)}</div>${this._config.group ? `<div class="sub">Group: ${esc(this._config.group)}</div>` : ""}</div></div>` : ""}
           <div class="targets">${rows || '<div class="empty">No HA Probulator targets match this card.</div>'}</div>
         </div>
       </ha-card>`;
@@ -672,7 +675,7 @@ class ProbulatorSummaryCard extends HTMLElement {
   }
 
   getCardSize() { return 3; }
-  getGridOptions() { return { columns: 12, rows: 3 }; }
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   _render() {
     if (!this.shadowRoot || !this._hass || !this._config) return;
@@ -754,7 +757,7 @@ class ProbulatorManagerCard extends HTMLElement {
   }
 
   getCardSize() { return 6; }
-  getGridOptions() { return { columns: 12, rows: 6 }; }
+  getGridOptions() { return { columns: 12, rows: "auto" }; }
 
   _applyFilter() {
     const search = this._search.trim().toLowerCase();
