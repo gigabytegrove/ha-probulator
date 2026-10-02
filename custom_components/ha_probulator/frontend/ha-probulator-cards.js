@@ -14,6 +14,9 @@ const PROBULATOR_STYLE = `
     --probulator-card-border-radius: var(--ha-card-border-radius, 12px);
     --probulator-gap: 12px;
     --probulator-metric-font-size: 1.25rem;
+    --probulator-card-padding: 16px;
+    --probulator-row-gap: 10px;
+    --probulator-field-gap: 10px;
     display: block;
     min-width: 0;
     container-type: inline-size;
@@ -26,7 +29,7 @@ const PROBULATOR_STYLE = `
     background: var(--probulator-card-background);
     border-radius: var(--probulator-card-border-radius);
   }
-  .wrap { padding: 16px; min-width:0; box-sizing:border-box; }
+  .wrap { padding: var(--probulator-card-padding); min-width:0; box-sizing:border-box; }
   .header { display:flex; align-items:center; gap:10px; min-width:0; }
   .grow { flex:1; min-width:0; }
   .name { font-weight:600; min-width:0; overflow-wrap:anywhere; }
@@ -89,8 +92,8 @@ const PROBULATOR_STYLE = `
   .summary-box .n { font-size:1.35rem; font-weight:700; }
   .summary-box .l { color:var(--secondary-text-color); font-size:.75rem; margin-top:2px; }
   .footer { color:var(--secondary-text-color); font-size:.78rem; margin-top:12px; }
-  .custom-layout { display:grid; gap:10px; min-width:0; }
-  .custom-line { display:flex; align-items:center; gap:10px; min-width:0; flex-wrap:wrap; }
+  .custom-layout { display:grid; gap:var(--probulator-row-gap); min-width:0; }
+  .custom-line { display:flex; align-items:center; gap:var(--probulator-field-gap); min-width:0; flex-wrap:wrap; }
   .custom-field { min-width:0; }
   .custom-grow { flex:1 1 auto; }
   .custom-spacer { flex:1 1 20px; min-width:8px; }
@@ -106,7 +109,7 @@ const PROBULATOR_STYLE = `
   .custom-status { margin-left:0; }
   .custom-warning { color:var(--warning-color); font-size:.76rem; overflow-wrap:anywhere; }
   @container (max-width: 440px) {
-    .wrap { padding: 12px; }
+    .wrap { padding: min(var(--probulator-card-padding), 12px); }
     .header { align-items:flex-start; flex-wrap:wrap; }
     .header .status { margin-left:auto; }
     .sub { white-space:normal; line-height:1.3; }
@@ -266,6 +269,9 @@ function applyInlineTheme(element, config) {
     background: "--probulator-card-background",
     border_radius: "--probulator-card-border-radius",
     metric_font_size: "--probulator-metric-font-size",
+    card_padding: "--probulator-card-padding",
+    row_gap: "--probulator-row-gap",
+    field_gap: "--probulator-field-gap",
   };
   for (const [key, cssVar] of Object.entries(map)) {
     if (config?.[key]) element.style.setProperty(cssVar, config[key]);
@@ -335,6 +341,12 @@ class ProbulatorFormEditor extends HTMLElement {
 
 class ProbulatorTargetEditor extends ProbulatorFormEditor {
   setConfig(config) {
+    const normalized = { ...config };
+    if (normalized.mode === "custom" && layoutRows(normalized, "line", 8).length === 0) {
+      normalized.line_1 = "icon, name, spacer, status";
+      normalized.line_2 = "target";
+      normalized.line_3 = "response:stack, success:stack";
+    }
     super.setConfig({
       mode: "normal",
       show_response: true,
@@ -344,7 +356,7 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       show_jitter: false,
       show_sparkline: true,
       custom_show_labels: true,
-      ...config,
+      ...normalized,
     });
   }
 
@@ -371,6 +383,10 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       { name: "line_8", selector: { text: {} } },
       { name: "custom_show_labels", selector: { boolean: {} } },
       { name: "custom_labels", selector: { text: {} } },
+      { name: "custom_hide_empty", selector: { boolean: {} } },
+      { name: "card_padding", selector: { text: {} } },
+      { name: "row_gap", selector: { text: {} } },
+      { name: "field_gap", selector: { text: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
       { name: "offline_color", selector: { text: {} } },
@@ -398,13 +414,17 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
       line_8: "Custom line 8",
       custom_show_labels: "Show labels in Custom mode",
       custom_labels: "Custom labels (field=Label; field=Label)",
+      custom_hide_empty: "Hide fields with no value",
+      card_padding: "Card padding (CSS value)",
+      row_gap: "Custom row gap (CSS value)",
+      field_gap: "Custom field gap (CSS value)",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
       offline_color: "Offline color (CSS value)",
       background: "Card background (CSS value)",
       border_radius: "Border radius (CSS value)",
       metric_font_size: "Metric font size (CSS value)",
-    }, "Custom mode fields: icon, name, target, host, port, group, status, quality, response, average, min, max, p95, jitter, success, samples, failures, consecutive_failures, last_check, last_success, last_failure, status_change, outage, last_outage, stable_since, probe_interval, dependency, maintenance_until, error, probe_type, spacer, divider, sparkline. Put comma-separated fields on each Custom line.");
+    }, "Custom mode fields: icon, name, target, host, port, group, status, quality, response, average, min, max, p95, jitter, success, samples, failures, consecutive_failures, last_check, last_success, last_failure, status_change, outage, last_outage, stable_since, probe_interval, dependency, maintenance_until, error, probe_type, spacer, divider, sparkline. Put comma-separated fields on each Custom line. Add :value, :inline, or :stack to a field to override its presentation, for example response:value or last_check:inline.");
   }
 }
 
@@ -412,7 +432,7 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
   setConfig(config) {
     const normalized = { ...config };
     if (normalized.title === "HA Probulator") delete normalized.title;
-    super.setConfig({ sort: "status", ...normalized });
+    super.setConfig({ sort: "status", custom_show_labels: false, ...normalized });
   }
 
   constructor() {
@@ -428,6 +448,10 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
       { name: "item_line_4", selector: { text: {} } },
       { name: "custom_show_labels", selector: { boolean: {} } },
       { name: "custom_labels", selector: { text: {} } },
+      { name: "custom_hide_empty", selector: { boolean: {} } },
+      { name: "card_padding", selector: { text: {} } },
+      { name: "row_gap", selector: { text: {} } },
+      { name: "field_gap", selector: { text: {} } },
       { name: "online_color", selector: { text: {} } },
       { name: "degraded_color", selector: { text: {} } },
       { name: "offline_color", selector: { text: {} } },
@@ -444,6 +468,10 @@ class ProbulatorOverviewEditor extends ProbulatorFormEditor {
       item_line_4: "Target row line 4",
       custom_show_labels: "Show labels in custom target rows",
       custom_labels: "Custom labels (field=Label; field=Label)",
+      custom_hide_empty: "Hide fields with no value",
+      card_padding: "Card padding (CSS value)",
+      row_gap: "Custom row gap (CSS value)",
+      field_gap: "Custom field gap (CSS value)",
       online_color: "Online color (CSS value)",
       degraded_color: "Degraded color (CSS value)",
       offline_color: "Offline color (CSS value)",
@@ -608,8 +636,15 @@ function parseCustomLabels(value) {
 function parseLayoutTokens(value) {
   return String(value || "")
     .split(",")
-    .map((token) => token.trim().toLowerCase())
-    .filter(Boolean);
+    .map((raw) => raw.trim().toLowerCase())
+    .filter(Boolean)
+    .map((raw) => {
+      const [key, requestedStyle] = raw.split(":", 2);
+      const style = ["value", "inline", "stack"].includes(requestedStyle)
+        ? requestedStyle
+        : null;
+      return { raw, key, style };
+    });
 }
 
 function layoutRows(config, prefix = "line", count = 8) {
@@ -675,7 +710,8 @@ function fieldValue(key, stateObj, config = {}) {
   }
 }
 
-function renderLayoutField(key, stateObj, config, labels, compact = false) {
+function renderLayoutField(token, stateObj, config, labels, compact = false) {
+  const { key, style } = token;
   const a = stateObj?.attributes || {};
   const status = stateStatus(stateObj);
   const label = labels[key] || PROBULATOR_DEFAULT_LABELS[key] || key;
@@ -687,25 +723,44 @@ function renderLayoutField(key, stateObj, config, labels, compact = false) {
     const icon = config.icon || a.icon || "mdi:lan-connect";
     return `<span class="custom-field custom-icon"><ha-icon icon="${esc(icon)}"></ha-icon></span>`;
   }
-  if (key === "status") {
-    return `<span class="custom-field custom-status pill ${status}">${esc(statusLabel(status))}</span>`;
-  }
 
   const value = fieldValue(key, stateObj, config);
-  if (key === "name") {
-    return `<span class="custom-field custom-grow custom-primary">${esc(value)}</span>`;
-  }
-  if (["target", "host", "group", "dependency", "error"].includes(key)) {
-    if (config.custom_show_labels === true && !compact) {
-      return `<span class="custom-field custom-grow custom-inline"><span class="custom-metric-label">${esc(label)}</span><span class="custom-secondary">${esc(value)}</span></span>`;
-    }
-    return `<span class="custom-field custom-grow custom-secondary">${esc(value)}</span>`;
+  if (
+    config.custom_hide_empty === true
+    && !["name", "status"].includes(key)
+    && (value == null || value === "" || value === "—")
+  ) {
+    return "";
   }
 
-  if (config.custom_show_labels === false || compact) {
-    return `<span class="custom-field custom-metric-value">${esc(value)}</span>`;
+  if (key === "status" && style !== "value" && style !== "inline" && style !== "stack") {
+    return `<span class="custom-field custom-status pill ${status}">${esc(statusLabel(status))}</span>`;
   }
-  return `<span class="custom-field custom-metric"><span class="custom-metric-label">${esc(label)}</span><span class="custom-metric-value">${esc(value)}</span></span>`;
+  if (key === "name" && style !== "inline" && style !== "stack") {
+    return `<span class="custom-field custom-grow custom-primary">${esc(value)}</span>`;
+  }
+
+  const defaultValueOnly = compact || config.custom_show_labels === false;
+  const effectiveStyle = style || (
+    ["target", "host", "group", "dependency", "error"].includes(key)
+      ? (config.custom_show_labels === true && !compact ? "inline" : "value")
+      : (defaultValueOnly ? "value" : "stack")
+  );
+
+  const valueClass = ["target", "host", "group", "dependency", "error"].includes(key)
+    ? "custom-secondary"
+    : "custom-metric-value";
+  const growClass = ["name", "target", "host", "group", "dependency", "error"].includes(key)
+    ? " custom-grow"
+    : "";
+
+  if (effectiveStyle === "value") {
+    return `<span class="custom-field${growClass} ${valueClass}">${esc(value)}</span>`;
+  }
+  if (effectiveStyle === "inline") {
+    return `<span class="custom-field${growClass} custom-inline"><span class="custom-metric-label">${esc(label)}</span><span class="${valueClass}">${esc(value)}</span></span>`;
+  }
+  return `<span class="custom-field${growClass} custom-metric"><span class="custom-metric-label">${esc(label)}</span><span class="${valueClass}">${esc(value)}</span></span>`;
 }
 
 function renderCustomLayout(stateObj, config, prefix = "line", count = 8, compact = false) {
@@ -715,8 +770,8 @@ function renderCustomLayout(stateObj, config, prefix = "line", count = 8, compac
 
   const html = rows.map((row) => {
     const fields = row.map((token) => {
-      if (!PROBULATOR_LAYOUT_FIELDS.has(token)) {
-        unknown.add(token);
+      if (!PROBULATOR_LAYOUT_FIELDS.has(token.key)) {
+        unknown.add(token.raw);
         return "";
       }
       return renderLayoutField(token, stateObj, config, labels, compact);
@@ -774,6 +829,12 @@ class ProbulatorCard extends HTMLElement {
 
   setConfig(config) {
     if (!config || !config.entity) throw new Error("HA Probulator card requires an entity");
+    const normalized = { ...config };
+    if (normalized.mode === "custom" && layoutRows(normalized, "line", 8).length === 0) {
+      normalized.line_1 = "icon, name, spacer, status";
+      normalized.line_2 = "target";
+      normalized.line_3 = "response:stack, success:stack";
+    }
     this._config = {
       mode: "normal",
       show_response: true,
@@ -783,7 +844,7 @@ class ProbulatorCard extends HTMLElement {
       show_jitter: false,
       show_sparkline: true,
       custom_show_labels: true,
-      ...config,
+      ...normalized,
     };
     if (!["minimal", "normal", "extended", "custom"].includes(this._config.mode)) {
       throw new Error("mode must be minimal, normal, extended, or custom");
@@ -959,7 +1020,7 @@ class ProbulatorOverviewCard extends HTMLElement {
       if (hasCustomLayout) {
         return `
           <div class="target-row custom-target-row" data-entity="${esc(stateObj.entity_id)}" role="button" tabindex="0">
-            ${renderCustomLayout(stateObj, this._config, "item_line", 4, true)}
+            ${renderCustomLayout(stateObj, this._config, "item_line", 4, false)}
           </div>`;
       }
       return `
