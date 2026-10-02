@@ -321,7 +321,9 @@ class ProbulatorTargetEditor extends ProbulatorFormEditor {
 
 class ProbulatorOverviewEditor extends ProbulatorFormEditor {
   setConfig(config) {
-    super.setConfig({ sort: "status", ...config });
+    const normalized = { ...config };
+    if (normalized.title === "HA Probulator") delete normalized.title;
+    super.setConfig({ sort: "status", ...normalized });
   }
 
   constructor() {
@@ -595,7 +597,9 @@ class ProbulatorOverviewCard extends HTMLElement {
   }
 
   setConfig(config) {
-    this._config = { sort: "status", ...config };
+    const normalized = { ...config };
+    if (normalized.title === "HA Probulator") delete normalized.title;
+    this._config = { sort: "status", ...normalized };
     applyInlineTheme(this, this._config);
     this._render();
   }
