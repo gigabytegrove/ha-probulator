@@ -22,6 +22,8 @@ Operational intelligence and large-installation polish.
 - Added administrator-only portable clone/import/export actions with dependency remapping and normal config-flow validation.
 - Added non-invasive target suggestions from network-address attributes already known to Home Assistant; no subnet or port scan is performed.
 - Added native Overall and per-group aggregate devices with Healthy, Availability, and Average response time entities.
+- Removed the redundant default `HA Probulator` heading from Overview cards, including legacy saved defaults, while preserving explicitly customized titles.
+- Switched dashboard cards to Home Assistant's natural Section-grid height so cards no longer reserve large empty row blocks below their rendered content.
 
 ## 1.1.0 - 2026-10-01
 
