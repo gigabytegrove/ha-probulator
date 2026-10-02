@@ -1,5 +1,20 @@
 # Changelog
 
+## 1.2.2 - 2026-10-02
+
+Responsive Sections-layout patch.
+
+- Added flexible Home Assistant grid width ranges instead of treating every card as a fixed-width block.
+- Target cards default to 6 columns but can be resized from 3 through 12 columns.
+- Summary cards can be resized from 6 through 12 columns.
+- Overview and Manager cards default to a full Section row to avoid the short-card/tall-card row-gap problem in Home Assistant Sections.
+- Replaced viewport-width styling with CSS container queries so each card reflows according to its actual allocated width.
+- Long names, addresses, group names, dependency labels, metrics, and Extended details now wrap instead of being forcibly ellipsized.
+- Overview latency and status fields reflow onto additional rows when the card becomes narrow.
+- Metric, Summary, Extended-detail, and Manager layouts progressively collapse at narrow card widths.
+- Added regression coverage for the responsive grid sizing contract.
+- Bumped the frontend resource version so Home Assistant cannot reuse the 1.2.1 card bundle from cache.
+
 ## 1.2.1 - 2026-10-02
 
 Card layout/cache-busting patch.
