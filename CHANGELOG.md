@@ -1,5 +1,14 @@
 # Changelog
 
+## 1.2.1 - 2026-10-02
+
+Card layout/cache-busting patch.
+
+- Removed the redundant default `HA Probulator` title from Overview cards, including previously saved legacy default titles.
+- Switched Target, Overview, Summary, and Manager cards to Home Assistant natural Section-grid height with `rows: "auto"` so cards no longer reserve large empty blocks below their content.
+- Bumped the backend and frontend resource version so Home Assistant loads the corrected dashboard bundle instead of reusing cached 1.2.0 JavaScript.
+- Added regression coverage for legacy-title suppression and natural grid sizing.
+
 ## 1.2.0 - 2026-10-01
 
 Operational intelligence and large-installation polish.
