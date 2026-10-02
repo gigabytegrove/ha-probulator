@@ -1,5 +1,21 @@
 # Changelog
 
+## 1.3.0 - 2026-10-02
+
+Fully customizable card-layout pass.
+
+- Added a fourth Target-card mode, `custom`, with up to eight user-defined rows.
+- Added a reusable field-layout engine so users choose exactly which metrics/status values appear and which line they appear on.
+- Added per-field `:value`, `:inline`, and `:stack` rendering modifiers.
+- Added structural layout fields including `spacer`, `divider`, `sparkline`, `icon`, and `status_dot`.
+- Expanded the field palette to include response-time statistics, availability, jitter, thresholds, relative checked time, service type, monitoring/maintenance state, dependency state, flapping, outage statistics, probe counters, retry/timeout settings, and runtime probe timing.
+- Added custom label overrides and optional empty-value suppression.
+- Added configurable card padding, row gap, and field gap.
+- Added sensible default Custom rows so switching modes never produces a blank card.
+- Added the same row-layout engine to Overview-card target rows with up to four lines per target.
+- Added hostile-label escaping, row-order, default-row, field-rendering, and custom Overview regression coverage.
+- Bumped backend, manifest, and frontend bundle together to 1.3.0 so Home Assistant loads the new card editor and layout engine instead of a cached 1.2.x bundle.
+
 ## 1.2.2 - 2026-10-02
 
 Responsive Sections-layout patch.
