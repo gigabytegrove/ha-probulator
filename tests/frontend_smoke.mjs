@@ -141,6 +141,40 @@ if (!target.shadowRoot.innerHTML.includes("&lt;img")) {
   throw new Error("target card did not visibly escape hostile target text");
 }
 
+
+const OverviewCard = registry.get("probulator-overview-card");
+const overviewStub = OverviewCard.getStubConfig();
+if ("title" in overviewStub) {
+  throw new Error("overview card still injects a default title");
+}
+const overview = new OverviewCard();
+overview.setConfig({ title: "HA Probulator", sort: "status" });
+overview.hass = {
+  states: {
+    "binary_sensor.dns_1": {
+      entity_id: "binary_sensor.dns_1",
+      state: "on",
+      attributes: {
+        probulator: true,
+        probulator_kind: "target",
+        target_name: "DNS 1",
+        target: "192.168.0.2:53",
+        status: "online",
+        response_time_ms: 1.7,
+      },
+    },
+  },
+};
+if (overview.shadowRoot.innerHTML.includes(">HA Probulator<")) {
+  throw new Error("legacy overview title was not suppressed");
+}
+if (overview.getGridOptions().rows !== "auto") {
+  throw new Error("overview card is not using natural grid height");
+}
+if (target.getGridOptions().rows !== "auto") {
+  throw new Error("target card is not using natural grid height");
+}
+
 const ManagerCard = registry.get("probulator-manager-card");
 const managerStub = ManagerCard.getStubConfig();
 if (managerStub.show_bulk_actions !== true) {
