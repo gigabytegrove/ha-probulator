@@ -261,6 +261,9 @@ offline_color: "#d50000"
 
 Auto-discovers every HA Probulator target:
 
+Overview cards do not add a product-name heading by default. Set `title:` only when you actually want an internal card title. Legacy cards that saved the old default `HA Probulator` title automatically suppress it.
+
+
 ```yaml
 type: custom:probulator-overview-card
 title: Network
