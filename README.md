@@ -1,5 +1,11 @@
 # HA Probulator
 
+[![GitHub stars](https://img.shields.io/github/stars/gigabytegrove/ha-probulator?style=flat&label=Stars)](https://github.com/gigabytegrove/ha-probulator/stargazers)
+[![GitHub repository](https://img.shields.io/badge/GitHub-Repository-181717?logo=github&logoColor=white)](https://github.com/gigabytegrove/ha-probulator)
+[![Open issues](https://img.shields.io/github/issues/gigabytegrove/ha-probulator)](https://github.com/gigabytegrove/ha-probulator/issues)
+[![Latest GitHub release](https://img.shields.io/github/v/release/gigabytegrove/ha-probulator?label=Release)](https://github.com/gigabytegrove/ha-probulator/releases)
+[![Donate with PayPal](https://img.shields.io/badge/Donate-PayPal-0070BA?logo=paypal&logoColor=white)](https://paypal.me/gigabytegrove)
+
 **LAN, WAN, and TCP service availability monitoring for Home Assistant.**
 
 HA Probulator monitors TCP endpoints directly from Home Assistant and exposes the results as ordinary Home Assistant devices and entities. Its custom dashboard cards are optional: the same reachability, latency, reliability, and state data can be used with built-in cards, templates, automations, history, and third-party dashboards.
@@ -624,3 +630,7 @@ MIT. See [LICENSE](LICENSE).
 Tagged releases are built only when the tag version matches the integration manifest. The release workflow produces a deterministic `ha-probulator-vX.Y.Z.zip` and a `SHA256SUMS` file so manual downloads can be verified.
 
 CI dependencies are pinned to immutable commit SHAs and Dependabot is configured to propose updates rather than silently following moving action branches.
+
+## Support Gigabyte Grove
+
+If this project is useful to you, you can support ongoing Gigabyte Grove development with an optional [PayPal donation](https://paypal.me/gigabytegrove). Donations are appreciated but never required to use this integration.
