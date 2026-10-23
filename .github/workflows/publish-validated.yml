@@ -1,0 +1,115 @@
+name: Publish validated release
+
+on:
+  workflow_run:
+    workflows:
+      - Validate
+    types:
+      - completed
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish HA Probulator release
+    if: github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+          fetch-depth: 0
+      - name: Verify validated source and release version
+        id: verify
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -Eeuo pipefail
+          git fetch origin main
+          if [[ "$(git rev-parse origin/main)" != "$VALIDATED_SHA" ]]; then
+            echo "Superseded validation; no release."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          VERSION="$(python3 - <<'PY'
+          import json
+          from pathlib import Path
+          print(json.loads(Path("custom_components/ha_probulator/manifest.json").read_text(encoding="utf-8"))["version"])
+          PY
+          )"
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "Invalid version: $VERSION" >&2; exit 1; }
+          TAG="v$VERSION"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+            echo "publish=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git ls-remote --exit-code --tags origin "refs/tags/$TAG" >/dev/null 2>&1; then
+            git fetch origin "refs/tags/$TAG:refs/tags/$TAG"
+            [[ "$(git rev-list -n 1 "$TAG")" == "$VALIDATED_SHA" ]] || {
+              echo "Tag $TAG already exists at a different commit; refusing to move it." >&2
+              exit 1
+            }
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "publish=true" >> "$GITHUB_OUTPUT"
+
+      - name: Package the validated release
+        if: steps.verify.outputs.publish == 'true'
+        shell: bash
+        env:
+          TAG: ${{ steps.verify.outputs.tag }}
+        run: |
+          set -Eeuo pipefail
+          mkdir -p dist
+          python3 - <<'PY'
+          import os
+          from pathlib import Path
+          from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
+          output = Path("dist") / ("ha-probulator-" + os.environ["TAG"] + ".zip")
+          for path in (Path("custom_components/ha_probulator"), Path("README.md"), Path("LICENSE"), Path("hacs.json")):
+              if not path.exists():
+                  raise SystemExit(f"Missing release source: {path}")
+          with ZipFile(output, "w", ZIP_DEFLATED, compresslevel=9) as archive:
+              paths = sorted(Path("custom_components/ha_probulator").rglob("*"))
+              paths += [Path("README.md"), Path("LICENSE"), Path("hacs.json")]
+              for path in paths:
+                  if not path.is_file() or "__pycache__" in path.parts or path.suffix == ".pyc":
+                      continue
+                  info = ZipInfo(path.as_posix(), (2020, 1, 1, 0, 0, 0))
+                  info.compress_type = ZIP_DEFLATED
+                  archive.writestr(info, path.read_bytes())
+          PY
+          (cd dist && sha256sum "ha-probulator-$TAG.zip" > SHA256SUMS)
+          unzip -t "dist/ha-probulator-$TAG.zip"
+          cat > dist/RELEASE_NOTES.md <<'NOTES'
+          **Focus:** First published GitHub release of HA Probulator's validated Home Assistant integration.
+
+          ## What this release provides
+          - Direct TCP endpoint monitoring from Home Assistant, without requiring ICMP/ping or an external server.
+          - Configurable retries, health thresholds, latency statistics, status-change events, device diagnostics, and optional dashboard cards.
+          - A versioned release for HACS users and a checksum-protected ZIP for manual installation.
+
+          ## Installation and limitations
+          Install this repository through HACS as a custom integration and restart Home Assistant, then add HA Probulator from Settings → Devices & services. A successful TCP connection proves only the selected port accepts connections; it does not establish application-level correctness. For the full feature reference and setup guidance, see README.md.
+          NOTES
+
+      - name: Publish GitHub release
+        if: steps.verify.outputs.publish == 'true'
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.verify.outputs.tag }}
+          VALIDATED_SHA: ${{ github.event.workflow_run.head_sha }}
+        run: |
+          set -Eeuo pipefail
+          gh release create "$TAG" \
+            "dist/ha-probulator-$TAG.zip" dist/SHA256SUMS \
+            --repo "$GITHUB_REPOSITORY" \
+            --target "$VALIDATED_SHA" \
+            --title "HA Probulator $TAG" \
+            --notes-file dist/RELEASE_NOTES.md
