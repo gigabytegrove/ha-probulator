@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.3.1 - 2026-11-16
+
+Security and Home Assistant compatibility hardening:
+
+- Reject externally fetching CSS `url()`, `image-set()` and legacy executable CSS expressions in card theme configuration while preserving legitimate CSS colors, variables and layout dimensions.
+- Use a null-prototype mapping for custom field labels to avoid inherited-property lookup surprises.
+- Add hostile CSS injection regression coverage to the existing frontend smoke suite.
+- Target Home Assistant Core 2026.11.1 with an explicit import qualification job, preserving all card modes, entity IDs and user layouts.
+- Runtime functionality remains dependent on the owner installation; no live Home Assistant deployment was tested.
+
+
 ## 1.3.0 - 2026-10-02
 
 Fully customizable card-layout pass.

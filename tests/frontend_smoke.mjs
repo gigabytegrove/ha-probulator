@@ -18,7 +18,12 @@ class ShadowRootStub {
 
 globalThis.HTMLElement = class {
   constructor() {
-    this.style = { setProperty() {}, removeProperty() {} };
+    const properties = new Map();
+    this.style = {
+      values: properties,
+      setProperty(key, value) { properties.set(key, value); },
+      removeProperty(key) { properties.delete(key); },
+    };
   }
   attachShadow() {
     this.shadowRoot = new ShadowRootStub();
@@ -110,6 +115,15 @@ for (const [cardName, editorName] of [
   if (editor.tagName !== editorName) {
     throw new Error(`${cardName} returned ${editor.tagName}, expected ${editorName}`);
   }
+}
+
+const hostileTheme = new TargetCard();
+hostileTheme.setConfig({ entity: "binary_sensor.missing", background: "url(https://attacker.example/test)", online_color: "#00ff00" });
+if (hostileTheme.style.values.has("--probulator-card-background")) {
+  throw new Error("unsafe external CSS asset accepted from card configuration");
+}
+if (hostileTheme.style.values.get("--probulator-online-color") !== "#00ff00") {
+  throw new Error("valid custom theme color was rejected");
 }
 
 const target = new TargetCard();

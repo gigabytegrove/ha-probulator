@@ -1,4 +1,4 @@
-const PROBULATOR_FRONTEND_VERSION = "1.3.0";
+const PROBULATOR_FRONTEND_VERSION = "1.3.1";
 
 const PROBULATOR_STYLE = `
   :host {
@@ -256,6 +256,16 @@ function fireMoreInfo(element, entityId) {
   }));
 }
 
+function safeThemeValue(value) {
+  if (typeof value !== "string" || value.length > 120) return null;
+  const text = value.trim();
+  // CSS url()/image-set() can fetch third-party resources from HA dashboards.
+  if (!text || /[\u0000-\u001f{};]/.test(text)
+      || /(?:url|image-set|-moz-binding|expression)\s*\(/i.test(text)
+      || /@import/i.test(text)) return null;
+  return text;
+}
+
 function applyInlineTheme(element, config) {
   const map = {
     online_color: "--probulator-online-color",
@@ -274,7 +284,8 @@ function applyInlineTheme(element, config) {
     field_gap: "--probulator-field-gap",
   };
   for (const [key, cssVar] of Object.entries(map)) {
-    if (config?.[key]) element.style.setProperty(cssVar, config[key]);
+    const safeValue = safeThemeValue(config?.[key]);
+    if (safeValue !== null) element.style.setProperty(cssVar, safeValue);
     else element.style.removeProperty(cssVar);
   }
 }
@@ -663,7 +674,7 @@ const PROBULATOR_DEFAULT_LABELS = {
 };
 
 function parseCustomLabels(value) {
-  const labels = {};
+  const labels = Object.create(null);
   String(value || "").split(";").forEach((entry) => {
     const split = entry.indexOf("=");
     if (split <= 0) return;

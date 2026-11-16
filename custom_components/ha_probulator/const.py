@@ -4,7 +4,7 @@ from __future__ import annotations
 
 DOMAIN = "ha_probulator"
 NAME = "HA Probulator"
-VERSION = "1.3.0"
+VERSION = "1.3.1"
 
 DATA_MANAGER = "_manager"
 DATA_FRONTEND_REGISTERED = "_frontend_registered"
